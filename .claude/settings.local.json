@@ -1,0 +1,39 @@
+{
+	"permissions": {
+		"allow": ["Bash(pnpm install:*)", "Bash(pnpm build:*)"]
+	},
+
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": ".claude/hooks/lint-loop.sh"
+					}
+				]
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": ".claude/hooks/protect-eslint.sh"
+					}
+				]
+			},
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": ".claude/hooks/protect-eslint-bash.sh"
+					}
+				]
+			}
+		]
+	}
+}
