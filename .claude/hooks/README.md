@@ -6,12 +6,12 @@ These hooks run automatically during Claude Code sessions to enforce code qualit
 
 ## Hooks overview
 
-| File | Trigger | Purpose |
-| --- | --- | --- |
-| `lint-loop.mjs` | `PostToolUse` → `Edit\|Write` | Runs ESLint after every file edit and blocks Claude if errors are found |
-| `lint-hints.mjs` | *(imported by lint-loop)* | Maps ESLint rule names to actionable fix guidance |
-| `protect-eslint.mjs` | `PreToolUse` → `Edit\|Write` | Blocks Claude from writing to ESLint config files |
-| `protect-eslint-bash.mjs` | `PreToolUse` → `Bash` | Blocks Claude from running shell commands that target ESLint config files |
+| File                      | Trigger                       | Purpose                                                                   |
+| ------------------------- | ----------------------------- | ------------------------------------------------------------------------- |
+| `lint-loop.mjs`           | `PostToolUse` → `Edit\|Write` | Runs ESLint after every file edit and blocks Claude if errors are found   |
+| `lint-hints.mjs`          | _(imported by lint-loop)_     | Maps ESLint rule names to actionable fix guidance                         |
+| `protect-eslint.mjs`      | `PreToolUse` → `Edit\|Write`  | Blocks Claude from writing to ESLint config files                         |
+| `protect-eslint-bash.mjs` | `PreToolUse` → `Bash`         | Blocks Claude from running shell commands that target ESLint config files |
 
 ---
 
@@ -48,22 +48,23 @@ A pure data module — no logic, just a map of ESLint rule names to hint strings
 The key is the exact rule name as it appears in ESLint output (e.g. `max-lines`, `security/detect-object-injection`).
 
 If a rule has no entry, the `genericHint` is used as a fallback:
+
 > "Refactor the code to comply with this rule — do not suppress, disable, or work around it. If the fix is unclear, stop and ask the user."
 
 **Currently covered rules:**
 
-| Rule | Guidance summary |
-| --- | --- |
-| `max-lines` | Extract into modules — blank lines don't count, use them freely for readability |
-| `max-lines-per-function` | Extract helper functions — don't compress or inline |
-| `no-comments/disallowComments` | Make code self-documenting — rename, extract, clarify |
-| `better-max-params/better-max-params` | Use an options object |
-| `no-magic-numbers` | Extract named constants |
-| `security/detect-object-injection` | Use `Map` or validate keys |
-| `security/detect-non-literal-fs-filename` | Ensure path is from a trusted source |
-| `security/detect-unsafe-regex` | Simplify the regex |
-| `unicorn/filename-case` | Rename file to `kebab-case` or `PascalCase` |
-| `sonarjs/no-commented-code` | Delete or restore as live code |
+| Rule                                      | Guidance summary                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------------------- |
+| `max-lines`                               | Extract into modules — blank lines don't count, use them freely for readability |
+| `max-lines-per-function`                  | Extract helper functions — don't compress or inline                             |
+| `no-comments/disallowComments`            | Make code self-documenting — rename, extract, clarify                           |
+| `better-max-params/better-max-params`     | Use an options object                                                           |
+| `no-magic-numbers`                        | Extract named constants                                                         |
+| `security/detect-object-injection`        | Use `Map` or validate keys                                                      |
+| `security/detect-non-literal-fs-filename` | Ensure path is from a trusted source                                            |
+| `security/detect-unsafe-regex`            | Simplify the regex                                                              |
+| `unicorn/filename-case`                   | Rename file to `kebab-case` or `PascalCase`                                     |
+| `sonarjs/no-commented-code`               | Delete or restore as live code                                                  |
 
 ---
 
@@ -72,6 +73,7 @@ If a rule has no entry, the `genericHint` is used as a fallback:
 Runs before every `Edit` or `Write` tool call.
 
 Blocks any write to:
+
 - `eslint.config.{js,mjs,cjs,ts}` in any directory
 - Any file inside `packages/eslint-config/`
 
@@ -93,11 +95,32 @@ Hooks are registered in `.claude/settings.local.json`:
 {
   "hooks": {
     "PostToolUse": [
-      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "node .claude/hooks/lint-loop.mjs" }] }
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/lint-loop.mjs" }
+        ]
+      }
     ],
     "PreToolUse": [
-      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "node .claude/hooks/protect-eslint.mjs" }] },
-      { "matcher": "Bash",       "hooks": [{ "type": "command", "command": "node .claude/hooks/protect-eslint-bash.mjs" }] }
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/protect-eslint.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/protect-eslint-bash.mjs"
+          }
+        ]
+      }
     ]
   }
 }
@@ -110,5 +133,5 @@ To add a new hook, add an entry under the appropriate lifecycle key (`PreToolUse
 ## Design principles
 
 - **Hooks never modify files** — they only approve or block Claude's actions.
-- **Hints explain intent, not workarounds** — every hint tells Claude *why* a rule exists and guides toward the correct fix (refactor, rename, extract) rather than suppression.
+- **Hints explain intent, not workarounds** — every hint tells Claude _why_ a rule exists and guides toward the correct fix (refactor, rename, extract) rather than suppression.
 - **ESLint config is immutable to Claude** — rule changes must be made by a human. If a rule is wrong, that's a conversation, not a code edit.

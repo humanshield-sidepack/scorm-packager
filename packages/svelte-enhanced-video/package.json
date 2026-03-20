@@ -1,0 +1,86 @@
+{
+	"name": "svelte-enhanced-video",
+	"version": "0.0.1",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build && npm run prepack",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"prepack": "svelte-kit sync && svelte-package && publint",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"lint": "prettier --write . && eslint .",
+		"format": "prettier --write .",
+		"test:unit": "vitest",
+		"test": "npm run test:unit -- --run && npm run test:e2e",
+		"test:e2e": "playwright test"
+	},
+	"files": [
+		"dist",
+		"!dist/**/*.test.*",
+		"!dist/**/*.spec.*"
+	],
+	"sideEffects": [
+		"**/*.css"
+	],
+	"svelte": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"svelte": "./dist/index.js"
+		}
+	},
+	"peerDependencies": {
+		"svelte": "^5.0.0",
+		"ffmpeg-ffprobe-static": "^6.0.0",
+		"ffmpeg-static": "^5.0.0",
+		"ffprobe-static": "^3.0.0"
+	},
+	"dependencies": {
+		"magic-string": "^0.30.0",
+		"svelte-parse-markup": "^0.1.5",
+		"zimmerframe": "^1.1.2"
+	},
+	"peerDependenciesMeta": {
+		"ffmpeg-ffprobe-static": {
+			"optional": true
+		},
+		"ffmpeg-static": {
+			"optional": true
+		},
+		"ffprobe-static": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.58.2",
+		"@repo/eslint-config": "workspace:*",
+		"@repo/typescript-config": "workspace:*",
+		"@sveltejs/adapter-vercel": "^6.3.1",
+		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/package": "^2.5.7",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@types/node": "^24",
+		"@vitest/browser-playwright": "^4.1.0",
+		"eslint": "^9.39.2",
+		"ffmpeg-ffprobe-static": "6.1.2-rc.1",
+		"ffmpeg-static": "^5.3.0",
+		"ffprobe-static": "^3.1.0",
+		"playwright": "^1.58.2",
+		"prettier": "^3.8.1",
+		"prettier-plugin-svelte": "^3.4.1",
+		"publint": "^0.3.17",
+		"svelte": "^5.51.0",
+		"svelte-check": "^4.4.2",
+		"typescript": "^5.9.3",
+		"vite": "^7.3.1",
+		"vite-plugin-devtools-json": "^1.0.0",
+		"vitest": "^4.1.0",
+		"vitest-browser-svelte": "^2.0.2"
+	},
+	"keywords": [
+		"svelte"
+	]
+}

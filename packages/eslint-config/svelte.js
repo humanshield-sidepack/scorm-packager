@@ -26,7 +26,12 @@ export const svelteConfig = [
 		},
 	},
 	{
-		files: ["**/*.svelte", "**/*.svelte.ts", "**/*.svelte.js", "**/*.svelte.spec.ts"],
+		files: [
+			"**/*.svelte",
+			"**/*.svelte.ts",
+			"**/*.svelte.js",
+			"**/*.svelte.spec.ts",
+		],
 		languageOptions: {
 			parser: svelteParser,
 			parserOptions: {
@@ -48,6 +53,6 @@ export const svelteConfig = [
 		},
 	},
 	{
-		ignores: ["dist/**", ".svelte-kit/**", "build/**"],
+		ignores: ["dist/**", ".svelte-kit/**", "build/**", ".vercel/**"],
 	},
 ];

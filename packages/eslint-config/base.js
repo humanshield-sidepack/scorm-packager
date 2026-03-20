@@ -64,5 +64,6 @@ export const config = [
 				},
 			],
 		},
+		ignores: ["**/*.spec.ts", "**/*.test.ts"],
 	},
 ];
