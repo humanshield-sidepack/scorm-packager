@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { VideoFormat } from './encoder';
+import type { VideoFormat } from './encoder.js';
 
 export interface ResolvedAsset {
 	format: VideoFormat;
@@ -29,7 +29,12 @@ function normalizeBase(base: string): string {
 }
 
 function normalizeAssetsDirectory(assetsDirectory: string): string {
-	return assetsDirectory.trim().replace(/^\/+|\/+$/g, '');
+	const trimmed = assetsDirectory.trim();
+	let start = 0;
+	let end = trimmed.length;
+	while (start < end && trimmed[start] === '/') start++;
+	while (end > start && trimmed[end - 1] === '/') end--;
+	return trimmed.slice(start, end);
 }
 
 function buildAssetWebUrl(base: string, assetsDirectory: string, fileName: string): string {

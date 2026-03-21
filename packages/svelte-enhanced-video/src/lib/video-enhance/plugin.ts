@@ -2,18 +2,18 @@ import type { Plugin, Logger, ResolvedConfig } from 'vite';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { transformSvelteCode } from './transform';
-import type { VideoFormat } from './encoder';
-import { createDevelopmentState, setupDevelopmentServer } from './development-server';
-import type { DevelopmentServerReference } from './development-server';
-import { DEFAULT_RESOLUTIONS, DEFAULT_FORMATS, DEFAULT_LOCK_MAX_AGE_MS } from './plugin-types';
-import type { VideoPluginOptions, VideoParameters, DevelopmentLoadState } from './plugin-types';
-import { resolveBinaries } from './ffmpeg-resolver';
-import { handleBuildLoad } from './build-load';
-import type { InputContext, BuildDeps } from './build-load';
-import { handleDevelopmentLoad } from './development-load';
+import { transformSvelteCode } from './transform.js';
+import type { VideoFormat } from './encoder.js';
+import { createDevelopmentState, setupDevelopmentServer } from './development-server.js';
+import type { DevelopmentServerReference } from './development-server.js';
+import { DEFAULT_RESOLUTIONS, DEFAULT_FORMATS, DEFAULT_LOCK_MAX_AGE_MS } from './plugin-types.js';
+import type { VideoPluginOptions, VideoParameters, DevelopmentLoadState } from './plugin-types.js';
+import { resolveBinaries } from './ffmpeg-resolver.js';
+import { handleBuildLoad } from './build-load.js';
+import type { InputContext, BuildDeps } from './build-load.js';
+import { handleDevelopmentLoad } from './development-load.js';
 
-export type { VideoPluginOptions } from './plugin-types';
+export type { VideoPluginOptions } from './plugin-types.js';
 
 interface ResolvedPluginConfig {
 	formats: VideoFormat[];

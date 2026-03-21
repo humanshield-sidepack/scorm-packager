@@ -1,12 +1,12 @@
 import type { ViteDevServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ensureEncoded } from './development-encoder';
-import { getLockFilePath, isLockStale, cleanStaleLock } from './lock';
-import { EncodingQueue } from './encoding-queue';
-import { createVideoMiddleware } from './video-middleware';
-import { EXTERNAL_ENCODE_POLL_MS } from './plugin-types';
-import type { DevelopmentLoadState, EncodingPathState } from './plugin-types';
+import { ensureEncoded } from './development-encoder.js';
+import { getLockFilePath, isLockStale, cleanStaleLock } from './lock.js';
+import { EncodingQueue } from './encoding-queue.js';
+import { createVideoMiddleware } from './video-middleware.js';
+import { EXTERNAL_ENCODE_POLL_MS } from './plugin-types.js';
+import type { DevelopmentLoadState, EncodingPathState } from './plugin-types.js';
 
 export interface DevelopmentServerReference {
 	current?: ViteDevServer;

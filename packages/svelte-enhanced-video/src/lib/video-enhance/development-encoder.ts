@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildOutputFileName, encodeVideoAsync } from './encoder';
-import type { EnsureEncodedOptions, EncodeVideoOptions, VideoFormat } from './encoder';
-import { getLockFilePath, isLockStale, cleanStaleLock } from './lock';
-import { DEFAULT_LOCK_MAX_AGE_MS } from './plugin-types';
+import { buildOutputFileName, encodeVideoAsync } from './encoder.js';
+import type { EnsureEncodedOptions, EncodeVideoOptions, VideoFormat } from './encoder.js';
+import { getLockFilePath, isLockStale, cleanStaleLock } from './lock.js';
+import { DEFAULT_LOCK_MAX_AGE_MS } from './plugin-types.js';
 
 export interface AsyncEncoderDeps {
 	exists?: (filePath: string) => boolean;

@@ -1,5 +1,5 @@
-import type { EnsureEncodedOptions, VideoFormat } from './encoder';
-import type { VideoParameters } from './plugin-types';
+import type { EnsureEncodedOptions, VideoFormat } from './encoder.js';
+import type { VideoParameters } from './plugin-types.js';
 
 interface EncodeContext {
 	inputPath: string;

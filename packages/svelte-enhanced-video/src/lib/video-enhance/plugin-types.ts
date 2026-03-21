@@ -1,6 +1,6 @@
-import type { VideoFormat } from './encoder';
-import type { EncodingQueue } from './encoding-queue';
-import type { EnsureEncodedOptions } from './encoder';
+import type { VideoFormat } from './encoder.js';
+import type { EncodingQueue } from './encoding-queue.js';
+import type { EnsureEncodedOptions } from './encoder.js';
 
 export const RESOLUTION_4K = 2160;
 export const RESOLUTION_1440P = 1440;

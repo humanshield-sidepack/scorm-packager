@@ -17,5 +17,20 @@ export default [
 		rules: {
 			'unicorn/prevent-abbreviations': 'off'
 		}
+	},
+	{
+		files: ['src/lib/**/*.ts'],
+		ignores: ['src/lib/**/*.test.ts', 'src/lib/**/*.spec.ts'],
+		rules: {
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector:
+						"ImportDeclaration[source.value^='./']:not([source.value$='.js']), ImportDeclaration[source.value^='../']:not([source.value$='.js']), ExportNamedDeclaration[source.value^='./']:not([source.value$='.js']), ExportNamedDeclaration[source.value^='../']:not([source.value$='.js']), ExportAllDeclaration[source.value^='./']:not([source.value$='.js']), ExportAllDeclaration[source.value^='../']:not([source.value$='.js'])",
+					message:
+						'Relative runtime imports/exports in src/lib must include a .js extension for Node ESM compatibility.'
+				}
+			]
+		}
 	}
 ];

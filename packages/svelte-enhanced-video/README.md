@@ -50,6 +50,18 @@ To create a production version of your showcase app:
 npm run build
 ```
 
+## ESM guardrails
+
+To prevent publish-time Node ESM resolution regressions:
+
+```sh
+pnpm run check:esm-imports
+pnpm run check:dist-import
+```
+
+- `check:esm-imports` runs a NodeNext TypeScript check for runtime library imports.
+- `check:dist-import` verifies Node can import `dist/index.js` after packaging.
+
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.

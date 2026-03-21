@@ -1,12 +1,12 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { getVideoInfo, filterApplicableResolutions } from './encoder';
-import { ensureEncoded } from './development-encoder';
-import { resolveAssets, renderExportObject } from './assets';
-import { buildEnsureEncodedOptions } from './encode-options';
-import type { VideoParameters } from './plugin-types';
-import { HASH_SLICE_LENGTH } from './plugin-types';
+import { getVideoInfo, filterApplicableResolutions } from './encoder.js';
+import { ensureEncoded } from './development-encoder.js';
+import { resolveAssets, renderExportObject } from './assets.js';
+import { buildEnsureEncodedOptions } from './encode-options.js';
+import type { VideoParameters } from './plugin-types.js';
+import { HASH_SLICE_LENGTH } from './plugin-types.js';
 
 export interface InputContext {
 	inputPath: string;

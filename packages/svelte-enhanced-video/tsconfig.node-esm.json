@@ -1,0 +1,5 @@
+{
+	"extends": "@repo/typescript-config/node-esm-library",
+	"include": ["src/lib/**/*.ts"],
+	"exclude": ["src/lib/**/*.test.ts", "src/lib/**/*.spec.ts", "src/routes/**"]
+}

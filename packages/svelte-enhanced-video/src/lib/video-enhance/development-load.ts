@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildOutputFileName } from './encoder';
-import type { EnsureEncodedOptions, VideoFormat } from './encoder';
-import { ensureEncoded } from './development-encoder';
-import { getLockFilePath, isCached, isLockStale, cleanStaleLock } from './lock';
-import { resolveAssets, renderExportObject, renderFallbackModule } from './assets';
-import { resolveInputContext } from './build-load';
-import { buildEnsureEncodedOptions } from './encode-options';
-import type { VideoParameters, DevelopmentLoadState } from './plugin-types';
+import { buildOutputFileName } from './encoder.js';
+import type { EnsureEncodedOptions, VideoFormat } from './encoder.js';
+import { ensureEncoded } from './development-encoder.js';
+import { getLockFilePath, isCached, isLockStale, cleanStaleLock } from './lock.js';
+import { resolveAssets, renderExportObject, renderFallbackModule } from './assets.js';
+import { resolveInputContext } from './build-load.js';
+import { buildEnsureEncodedOptions } from './encode-options.js';
+import type { VideoParameters, DevelopmentLoadState } from './plugin-types.js';
 
 interface MissingEncodingsContext {
 	formats: VideoFormat[];

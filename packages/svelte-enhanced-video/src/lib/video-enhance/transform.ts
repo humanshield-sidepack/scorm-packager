@@ -2,8 +2,8 @@ import { parse } from 'svelte-parse-markup';
 import { walk } from 'zimmerframe';
 import MagicString from 'magic-string';
 import type { AST } from 'svelte/compiler';
-import { FORMAT_MIME_TYPES } from './encoder';
-import type { VideoFormat } from './encoder';
+import { FORMAT_MIME_TYPES } from './encoder.js';
+import type { VideoFormat } from './encoder.js';
 
 export interface TransformOptions {
 	resolutions: number[];

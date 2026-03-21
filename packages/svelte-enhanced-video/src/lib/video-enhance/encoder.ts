@@ -171,8 +171,8 @@ export async function encodeVideoAsync(
 		: execFileAsync(program, commandArguments, { maxBuffer: FFMPEG_MAX_BUFFER_BYTES }));
 }
 
-export { getVideoHeight, getVideoFps, getVideoInfo } from './video-probe';
-export type { VideoProbeDeps, VideoHeightDeps, VideoInfo } from './video-probe';
+export { getVideoHeight, getVideoFps, getVideoInfo } from './video-probe.js';
+export type { VideoProbeDeps, VideoHeightDeps, VideoInfo } from './video-probe.js';
 
 export function filterApplicableResolutions(resolutions: number[], sourceHeight: number): number[] {
 	return resolutions.filter((resolution) => resolution <= sourceHeight);
