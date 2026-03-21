@@ -207,34 +207,34 @@ describe('transformSvelteCode - multi-chunk src', () => {
 });
 
 describe('transformSvelteCode - warnings', () => {
-	it('emits a console.warn for a dynamic src expression', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		transformSvelteCode(`<video:enhanced src={myVar} />`, OPTIONS);
+	it('emits a warn for a dynamic src expression', () => {
+		const warn = vi.fn();
+		transformSvelteCode(`<video:enhanced src={myVar} />`, OPTIONS, warn);
 		expect(warn).toHaveBeenCalledOnce();
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('dynamic'));
-		warn.mockRestore();
 	});
 
-	it('emits a console.warn for a multi-chunk interpolated src', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		transformSvelteCode(`<video:enhanced src="prefix{someVar}.mp4" />`, OPTIONS);
+	it('emits a warn for a multi-chunk interpolated src', () => {
+		const warn = vi.fn();
+		transformSvelteCode(`<video:enhanced src="prefix{someVar}.mp4" />`, OPTIONS, warn);
 		expect(warn).toHaveBeenCalledOnce();
-		warn.mockRestore();
 	});
 
-	it('emits a console.warn when formats array is empty', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		transformSvelteCode(`<video:enhanced src="./foo.mp4" />`, { ...OPTIONS, formats: [] });
+	it('emits a warn when formats array is empty', () => {
+		const warn = vi.fn();
+		transformSvelteCode(`<video:enhanced src="./foo.mp4" />`, { ...OPTIONS, formats: [] }, warn);
 		expect(warn).toHaveBeenCalledOnce();
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('formats'));
-		warn.mockRestore();
 	});
 
-	it('emits a console.warn when resolutions array is empty', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		transformSvelteCode(`<video:enhanced src="./foo.mp4" />`, { ...OPTIONS, resolutions: [] });
+	it('emits a warn when resolutions array is empty', () => {
+		const warn = vi.fn();
+		transformSvelteCode(
+			`<video:enhanced src="./foo.mp4" />`,
+			{ ...OPTIONS, resolutions: [] },
+			warn
+		);
 		expect(warn).toHaveBeenCalledOnce();
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('resolutions'));
-		warn.mockRestore();
 	});
 });

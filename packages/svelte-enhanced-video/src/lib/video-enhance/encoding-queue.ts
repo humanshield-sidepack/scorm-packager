@@ -6,7 +6,8 @@ export class EncodingQueue {
 
 	constructor(
 		private readonly maxJobs: number,
-		private readonly onAllDone: () => void
+		private readonly onAllDone: () => void,
+		private readonly onError: (message: string, error: unknown) => void
 	) {}
 
 	enqueue(task: () => Promise<void>): void {
@@ -15,7 +16,7 @@ export class EncodingQueue {
 			try {
 				await task();
 			} catch (error) {
-				console.error('[video-plugin] encoding task failed:', error);
+				this.onError('[video-plugin] encoding task failed:', error);
 			} finally {
 				this.running--;
 				this.pending--;

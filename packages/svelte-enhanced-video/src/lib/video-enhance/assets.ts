@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { VideoFormat } from './encoder';
 
 export interface ResolvedAsset {
 	format: VideoFormat;
 	resolution: number;
-	/** The JS expression to embed (a string literal or a rollup import.meta ref) */
+	/** The JS expression to embed (a JSON string literal containing the web URL) */
 	expression: string;
 }
 
@@ -13,10 +12,34 @@ export interface AssetResolverOptions {
 	isBuild: boolean;
 	formats: VideoFormat[];
 	resolutions: number[];
-	readFile?: (filePath: string) => Buffer;
+	/** Vite's `config.base` — prepended to the asset URL in build mode. Default: '/'. */
+	base?: string;
+	/** Vite's `config.build.assetsDirectory` — the assets sub-directory in build mode. Default: 'assets'. */
+	assetsDirectory?: string;
 }
 
-export type EmitFileFunction = (options: { type: 'asset'; name: string; source: Buffer }) => string;
+const DEFAULT_BASE = '/';
+const DEFAULT_ASSETS_DIR = 'assets';
+
+function normalizeBase(base: string): string {
+	const trimmed = base.trim();
+	if (trimmed === '') return '/';
+	if (trimmed === '/') return '/';
+	return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+}
+
+function normalizeAssetsDirectory(assetsDirectory: string): string {
+	return assetsDirectory.trim().replace(/^\/+|\/+$/g, '');
+}
+
+function buildAssetWebUrl(base: string, assetsDirectory: string, fileName: string): string {
+	const normalizedBase = normalizeBase(base);
+	const normalizedAssetsDirectory = normalizeAssetsDirectory(assetsDirectory);
+	if (normalizedAssetsDirectory === '') {
+		return `${normalizedBase}${fileName}`;
+	}
+	return `${normalizedBase}${normalizedAssetsDirectory}/${fileName}`;
+}
 
 /**
  * Returns the dev-mode URL for a cached file, served via the plugin's own middleware.
@@ -27,14 +50,25 @@ export function developmentUrl(cachedPath: string): string {
 
 /**
  * Resolves all format/resolution combinations for a single input file,
- * returning the JS expression for each (either a URL string or a rollup file ref).
+ * returning the JS expression for each.
+ *
+ * Build mode: computes a static web URL (`base + assetsDirectory + '/' + fileName`)
+ * so the encoded video files can be copied directly to the output directory
+ * without reading them into memory via Rollup's emitFile API.
+ *
+ * Dev mode: returns a `/_enhanced-video/` middleware URL.
  */
 export function resolveAssets(
 	cachedPaths: Map<string, string>,
-	options: AssetResolverOptions,
-	emitFile?: EmitFileFunction
+	options: AssetResolverOptions
 ): ResolvedAsset[] {
-	const { isBuild, formats, resolutions, readFile = fs.readFileSync } = options;
+	const {
+		isBuild,
+		formats,
+		resolutions,
+		base = DEFAULT_BASE,
+		assetsDirectory = DEFAULT_ASSETS_DIR
+	} = options;
 	const assets: ResolvedAsset[] = [];
 
 	for (const format of formats) {
@@ -44,14 +78,11 @@ export function resolveAssets(
 			if (!cachedPath) continue;
 
 			if (isBuild) {
-				if (!emitFile) throw new Error('emitFile required in build mode');
-				const source = readFile(cachedPath);
 				const fileName = path.basename(cachedPath);
-				const reference = emitFile({ type: 'asset', name: fileName, source });
 				assets.push({
 					format,
 					resolution,
-					expression: `import.meta.ROLLUP_FILE_URL_${reference}`
+					expression: JSON.stringify(buildAssetWebUrl(base, assetsDirectory, fileName))
 				});
 			} else {
 				assets.push({
@@ -66,20 +97,12 @@ export function resolveAssets(
 	return assets;
 }
 
-export function normalizeVideoUrl(url: unknown): unknown {
-	if (typeof url === 'string' && url.startsWith('file:')) {
-		const index = url.indexOf('/_app/');
-		return index === -1 ? url : url.slice(index);
-	}
-	return url;
-}
-
-const NORMALIZER_HELPER =
-	'const __v=(u)=>{if(typeof u!=="string"||!u.startsWith("file:"))return u;const i=u.indexOf("/_app/");return i>=0?u.slice(i):u;};';
-
 /**
- * Renders the resolved assets as the body of the default export object.
- * e.g.:  { "mp4": { "1080p": "/path/to/file.mp4", ... }, ... }
+ * Renders a fallback module used while background encoding is in progress.
+ * All format/resolution slots point to the original (unencoded) video served
+ * via the plugin's middleware, so the browser can play the video immediately
+ * without waiting for encoding to complete. Replaced on the next hot reload
+ * once encoding finishes.
  */
 export function renderFallbackModule(
 	originalFileName: string,
@@ -97,12 +120,12 @@ export function renderFallbackModule(
 }
 
 export function renderExportObject(assets: ResolvedAsset[], formats: VideoFormat[]): string {
-	const parts: string[] = [NORMALIZER_HELPER, 'export default {'];
+	const parts: string[] = ['export default {'];
 
 	for (const format of formats) {
 		const entries = assets
 			.filter((a) => a.format === format)
-			.map((a) => `"${a.resolution}p": __v(${a.expression})`);
+			.map((a) => `"${a.resolution}p": ${a.expression}`);
 		parts.push(`  ${JSON.stringify(format)}: { ${entries.join(', ')} },`);
 	}
 

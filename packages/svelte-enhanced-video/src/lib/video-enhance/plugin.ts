@@ -1,20 +1,17 @@
-import type { Plugin } from 'vite';
-import fs from 'node:fs';
+import type { Plugin, Logger, ResolvedConfig } from 'vite';
 import path from 'node:path';
+import fs from 'node:fs';
 import os from 'node:os';
 import { transformSvelteCode } from './transform';
-import { getLockFilePath, buildOutputFileName } from './encoder';
-import type { EnsureEncodedOptions, VideoFormat } from './encoder';
-import { ensureEncodedAsync, isLockStale, cleanStaleLock } from './encoder-lock';
-import { resolveAssets, renderExportObject, renderFallbackModule } from './assets';
-import type { EmitFileFunction } from './assets';
+import type { VideoFormat } from './encoder';
 import { createDevelopmentState, setupDevelopmentServer } from './development-server';
 import type { DevelopmentServerReference } from './development-server';
 import { DEFAULT_RESOLUTIONS, DEFAULT_FORMATS, DEFAULT_LOCK_MAX_AGE_MS } from './plugin-types';
 import type { VideoPluginOptions, VideoParameters, DevelopmentLoadState } from './plugin-types';
 import { resolveBinaries } from './ffmpeg-resolver';
-import { resolveInputContext, handleBuildLoad, handleSsrBuildLoad } from './build-load';
-import type { InputContext, ClientBuildDeps } from './build-load';
+import { handleBuildLoad } from './build-load';
+import type { InputContext, BuildDeps } from './build-load';
+import { handleDevelopmentLoad } from './development-load';
 
 export type { VideoPluginOptions } from './plugin-types';
 
@@ -26,22 +23,31 @@ interface ResolvedPluginConfig {
 	ffmpegPath: string | undefined;
 	ffprobePath: string | undefined;
 	lockMaxAgeMs: number;
+	fps: number | undefined;
 }
 
 interface PluginBuildState {
-	clientReferences: Map<string, string>;
-	clientAssetUrls: Map<string, string>;
 	inputContextCache: Map<string, InputContext>;
+	filesToCopy: Map<string, string>;
 }
 
-interface MissingEncodingsContext {
-	formats: VideoFormat[];
-	applicableResolutions: number[];
-	baseName: string;
-	hash: string;
-	resolvedCacheDirectory: string;
-	inputPath: string;
-	ffmpegBin: string;
+interface PluginBuildConfig {
+	base: string;
+	assetsDirectory: string;
+	outDirectory: string;
+}
+
+interface PluginRuntimeState {
+	isBuild: boolean;
+	binaries: { ffmpeg: string; ffprobe: string };
+	pluginLogger: Logger;
+	developmentState: DevelopmentLoadState;
+	buildConfig: PluginBuildConfig;
+}
+
+interface TransformContext {
+	config: ResolvedPluginConfig;
+	warn: (message: string) => void;
 }
 
 function resolvePluginOptions(options: VideoPluginOptions): ResolvedPluginConfig {
@@ -52,16 +58,13 @@ function resolvePluginOptions(options: VideoPluginOptions): ResolvedPluginConfig
 		maxJobs: options.maxJobs ?? Math.max(1, os.cpus().length - 1),
 		ffmpegPath: options.ffmpegPath,
 		ffprobePath: options.ffprobePath,
-		lockMaxAgeMs: options.lockMaxAgeMs ?? DEFAULT_LOCK_MAX_AGE_MS
+		lockMaxAgeMs: options.lockMaxAgeMs ?? DEFAULT_LOCK_MAX_AGE_MS,
+		fps: options.fps
 	};
 }
 
 function createBuildState(): PluginBuildState {
-	return {
-		clientReferences: new Map(),
-		clientAssetUrls: new Map(),
-		inputContextCache: new Map()
-	};
+	return { inputContextCache: new Map(), filesToCopy: new Map() };
 }
 
 function buildVideoParameters(
@@ -74,7 +77,8 @@ function buildVideoParameters(
 		cacheDirectory: pluginConfig.cacheDirectory,
 		ffmpegBin: binaries.ffmpeg,
 		ffprobeBin: binaries.ffprobe,
-		lockMaxAgeMs: pluginConfig.lockMaxAgeMs
+		lockMaxAgeMs: pluginConfig.lockMaxAgeMs,
+		fps: pluginConfig.fps
 	};
 }
 
@@ -82,168 +86,132 @@ function isVideoModule(id: string, cleanId: string): boolean {
 	return /(^|[?&])enhanced($|&)/.test(id) && /\.(mp4|mov|webm)$/.test(cleanId);
 }
 
-function scheduleEncoding(
-	cachedPath: string,
-	encodeOptions: EnsureEncodedOptions,
-	state: DevelopmentLoadState
-): void {
-	const lockPath = getLockFilePath(cachedPath);
-	const lockExists = fs.existsSync(lockPath);
-	if (lockExists && !isLockStale(lockPath, state.lockMaxAgeMs)) {
-		state.watchedPaths.set(cachedPath, encodeOptions);
-		return;
-	}
-	if (lockExists) {
-		cleanStaleLock(lockPath, cachedPath);
-	}
-	if (!state.inFlightPaths.has(cachedPath)) {
-		state.inFlightPaths.add(cachedPath);
-		state.encodingQueue.enqueue(async () => {
-			await ensureEncodedAsync(encodeOptions, { lockMaxAgeMs: state.lockMaxAgeMs });
-			state.inFlightPaths.delete(cachedPath);
-		});
-	}
-}
-
-function scheduleMissingEncodings(
-	context: MissingEncodingsContext,
-	cachedPaths: Map<string, string>,
-	state: DevelopmentLoadState
-): boolean {
-	const {
-		formats,
-		applicableResolutions,
-		baseName,
-		hash,
-		resolvedCacheDirectory,
-		inputPath,
-		ffmpegBin
-	} = context;
-	let hasUncached = false;
-	for (const format of formats) {
-		for (const resolution of applicableResolutions) {
-			const fileName = buildOutputFileName({ baseName, hash, resolution, format });
-			const cachedPath = path.join(resolvedCacheDirectory, fileName);
-			cachedPaths.set(`${format}_${resolution}p`, cachedPath);
-			const lockPath = getLockFilePath(cachedPath);
-			if (!fs.existsSync(cachedPath) || fs.existsSync(lockPath)) {
-				hasUncached = true;
-				scheduleEncoding(
-					cachedPath,
-					{
-						inputPath,
-						baseName,
-						hash,
-						resolution,
-						format,
-						cacheDirectory: resolvedCacheDirectory,
-						ffmpegBin
-					},
-					state
-				);
-			}
-		}
-	}
-	return hasUncached;
-}
-
-async function handleDevelopmentLoad(
-	id: string,
-	parameters: VideoParameters,
-	state: DevelopmentLoadState
-): Promise<string> {
-	const cleanId = id.split('?')[0]!;
-	const { inputPath, baseName, hash, applicableResolutions } = resolveInputContext(
-		cleanId,
-		parameters
-	);
-	const { formats, cacheDirectory, ffmpegBin } = parameters;
-	const resolvedCacheDirectory = path.resolve(cacheDirectory);
-	fs.mkdirSync(resolvedCacheDirectory, { recursive: true });
-	const cachedPaths = new Map<string, string>();
-	const hasUncached = scheduleMissingEncodings(
-		{
-			formats,
-			applicableResolutions,
-			baseName,
-			hash,
-			resolvedCacheDirectory,
-			inputPath,
-			ffmpegBin
-		},
-		cachedPaths,
-		state
-	);
-	if (!hasUncached) {
-		return renderExportObject(
-			resolveAssets(cachedPaths, { isBuild: false, formats, resolutions: applicableResolutions }),
-			formats
-		);
-	}
-	state.pendingModuleIds.add(id);
-	const originalExtension = path.extname(inputPath).slice(1);
-	const originalFileName = `${baseName}_${hash}_original.${originalExtension}`;
-	state.originalFiles.set(originalFileName, inputPath);
-	return renderFallbackModule(originalFileName, formats, applicableResolutions);
-}
-
-function transformSvelteVideo(code: string, id: string, pluginConfig: ResolvedPluginConfig) {
+function transformSvelteVideo(code: string, id: string, context: TransformContext) {
 	if (!id.endsWith('.svelte')) return;
-	const transformed = transformSvelteCode(code, {
-		resolutions: pluginConfig.resolutions,
-		formats: pluginConfig.formats
-	});
+	const transformed = transformSvelteCode(
+		code,
+		{ resolutions: context.config.resolutions, formats: context.config.formats },
+		context.warn
+	);
 	if (!transformed) return;
 	return { code: transformed.code, map: transformed.map };
 }
 
+async function initRuntimeState(
+	pluginConfig: ResolvedPluginConfig,
+	serverReference: DevelopmentServerReference,
+	config: ResolvedConfig
+): Promise<PluginRuntimeState> {
+	const pluginLogger = config.logger;
+	const developmentState = createDevelopmentState({
+		maxJobs: pluginConfig.maxJobs,
+		serverReference,
+		lockMaxAgeMs: pluginConfig.lockMaxAgeMs,
+		warn: pluginLogger.warn.bind(pluginLogger),
+		log: pluginLogger.info.bind(pluginLogger),
+		logError: (message, error) => pluginLogger.error(`${message} ${String(error)}`)
+	});
+	const binaries = await resolveBinaries({
+		ffmpegPath: pluginConfig.ffmpegPath,
+		ffprobePath: pluginConfig.ffprobePath,
+		warn: pluginLogger.warn.bind(pluginLogger)
+	});
+	const buildConfig: PluginBuildConfig = {
+		base: config.base,
+		assetsDirectory: config.build.assetsDir,
+		outDirectory: config.build.outDir
+	};
+	return {
+		isBuild: config.command === 'build',
+		binaries,
+		pluginLogger,
+		developmentState,
+		buildConfig
+	};
+}
+
+function buildDeps(
+	buildState: PluginBuildState,
+	buildConfig: PluginBuildConfig,
+	logger: Logger
+): BuildDeps {
+	return {
+		copyFile: (source, destination) => buildState.filesToCopy.set(source, destination),
+		base: buildConfig.base,
+		assetsDirectory: buildConfig.assetsDirectory,
+		outDirectory: buildConfig.outDirectory,
+		inputContextCache: buildState.inputContextCache,
+		warn: logger.warn.bind(logger),
+		log: logger.info.bind(logger),
+		logError: (message, error) => logger.error(`${message} ${String(error)}`)
+	};
+}
+
+interface VideoLoadContext {
+	pluginConfig: ResolvedPluginConfig;
+	buildState: PluginBuildState;
+	runtime: PluginRuntimeState;
+}
+
+async function loadDevelopmentVideoModule(
+	id: string,
+	parameters: VideoParameters,
+	developmentState: DevelopmentLoadState
+): Promise<string> {
+	return handleDevelopmentLoad(id, parameters, developmentState);
+}
+
+async function loadBuildVideoModule(
+	cleanId: string,
+	parameters: VideoParameters,
+	context: Pick<VideoLoadContext, 'buildState' | 'runtime'>
+): Promise<string> {
+	const { buildState, runtime } = context;
+	return handleBuildLoad(
+		cleanId,
+		parameters,
+		buildDeps(buildState, runtime.buildConfig, runtime.pluginLogger)
+	);
+}
+
+async function handleVideoLoad(id: string, context: VideoLoadContext): Promise<string | undefined> {
+	const { pluginConfig, buildState, runtime } = context;
+	const cleanId = id.split('?')[0]!;
+	if (!cleanId || !isVideoModule(id, cleanId)) return undefined;
+	const parameters = buildVideoParameters(pluginConfig, runtime.binaries);
+	if (!runtime.isBuild) return loadDevelopmentVideoModule(id, parameters, runtime.developmentState);
+	return loadBuildVideoModule(cleanId, parameters, { buildState, runtime });
+}
+
 export default function enhancedVideo(options: VideoPluginOptions = {}): Plugin {
 	const pluginConfig = resolvePluginOptions(options);
-	let isBuild = false;
-	let binaries = { ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' };
 	const serverReference: DevelopmentServerReference = {};
-	const developmentState = createDevelopmentState(
-		pluginConfig.maxJobs,
-		serverReference,
-		pluginConfig.lockMaxAgeMs
-	);
 	const buildState = createBuildState();
+	let runtime!: PluginRuntimeState;
 	return {
 		name: 'vite-enhanced-video-plugin',
 		enforce: 'pre',
 		configureServer(server) {
 			serverReference.current = server;
-			return setupDevelopmentServer(server, pluginConfig.cacheDirectory, developmentState);
+			return setupDevelopmentServer(server, pluginConfig.cacheDirectory, runtime.developmentState);
 		},
 		async configResolved(config) {
-			isBuild = config.command === 'build';
-			binaries = await resolveBinaries({
-				ffmpegPath: pluginConfig.ffmpegPath,
-				ffprobePath: pluginConfig.ffprobePath
-			});
+			runtime = await initRuntimeState(pluginConfig, serverReference, config);
 		},
 		transform(code, id) {
-			return transformSvelteVideo(code, id, pluginConfig);
+			return transformSvelteVideo(code, id, {
+				config: pluginConfig,
+				warn: (message) => this.warn(message)
+			});
 		},
-		generateBundle() {
-			if (buildState.clientAssetUrls.size > 0) return;
-			for (const [cachedPath, referenceId] of buildState.clientReferences)
-				buildState.clientAssetUrls.set(cachedPath, `/${this.getFileName(referenceId)}`);
+		async load(id) {
+			return handleVideoLoad(id, { pluginConfig, buildState, runtime });
 		},
-		async load(id, options) {
-			const context = this as unknown as { emitFile: EmitFileFunction };
-			const cleanId = id.split('?')[0]!;
-			if (!cleanId || !isVideoModule(id, cleanId)) return;
-			const parameters = buildVideoParameters(pluginConfig, binaries);
-			if (!isBuild) return handleDevelopmentLoad(id, parameters, developmentState);
-			if (options?.ssr) return handleSsrBuildLoad(cleanId, parameters, buildState);
-			const clientBuildDeps: ClientBuildDeps = {
-				emitFile: context.emitFile,
-				onEmitted: (cachedPath, referenceId) =>
-					buildState.clientReferences.set(cachedPath, referenceId),
-				inputContextCache: buildState.inputContextCache
-			};
-			return handleBuildLoad(cleanId, parameters, clientBuildDeps);
+		writeBundle() {
+			for (const [source, destination] of buildState.filesToCopy) {
+				fs.mkdirSync(path.dirname(destination), { recursive: true });
+				fs.copyFileSync(source, destination);
+			}
 		}
 	};
 }

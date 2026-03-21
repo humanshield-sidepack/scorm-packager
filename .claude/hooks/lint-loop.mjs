@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
-const MAX_ATTEMPTS = 10;
+const MAX_ATTEMPTS = 3;
 
 const hooksDir = path.dirname(fileURLToPath(import.meta.url));
 const { ruleHints, genericHint } = await import(

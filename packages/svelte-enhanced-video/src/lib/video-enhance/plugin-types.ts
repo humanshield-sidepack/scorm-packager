@@ -34,6 +34,8 @@ export interface VideoPluginOptions {
 	ffmpegPath?: string;
 	ffprobePath?: string;
 	lockMaxAgeMs?: number;
+	/** Cap output frame rate at this value. Defaults to preserving the source fps. */
+	fps?: number;
 }
 
 export interface VideoParameters {
@@ -43,13 +45,26 @@ export interface VideoParameters {
 	ffmpegBin: string;
 	ffprobeBin: string;
 	lockMaxAgeMs: number;
+	fps?: number;
+}
+
+export type EncodingPathPhase = 'encoding' | 'waiting';
+
+export interface EncodingPathState {
+	phase: EncodingPathPhase;
+	encodeOptions: EnsureEncodedOptions;
 }
 
 export interface DevelopmentLoadState {
 	pendingModuleIds: Set<string>;
-	inFlightPaths: Set<string>;
-	watchedPaths: Map<string, EnsureEncodedOptions>;
+	pathStates: Map<string, EncodingPathState>;
 	encodingQueue: EncodingQueue;
 	originalFiles: Map<string, string>;
 	lockMaxAgeMs: number;
+	hasWarnedAboutEncoding: boolean;
+	warn: (message: string) => void;
+	log: (message: string) => void;
+	logError: (message: string, error: unknown) => void;
+	/** Clears the dev-server polling interval. Set by setupDevelopmentServer. */
+	dispose?: () => void;
 }

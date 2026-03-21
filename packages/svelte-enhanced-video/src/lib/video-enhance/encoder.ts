@@ -1,93 +1,100 @@
-import { execFileSync, execFile } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import fs from 'node:fs';
-import path from 'node:path';
 
 const execFileAsync = promisify(execFile);
 
 export type VideoFormat = 'mp4' | 'webm' | 'mp4_hevc';
 
-const CODEC_ARGUMENTS: Record<VideoFormat, string[]> = {
-	webm: [
-		'-c:v',
-		'libvpx-vp9',
-		'-crf',
-		'32',
-		'-b:v',
-		'0',
-		'-deadline',
-		'good',
-		'-cpu-used',
-		'2',
-		'-c:a',
-		'libopus',
-		'-b:a',
-		'96k'
+const CODEC_ARGUMENTS = new Map<VideoFormat, string[]>([
+	[
+		'webm',
+		[
+			'-c:v',
+			'libvpx-vp9',
+			'-crf',
+			'32',
+			'-b:v',
+			'0',
+			'-deadline',
+			'good',
+			'-cpu-used',
+			'2',
+			'-c:a',
+			'libopus',
+			'-b:a',
+			'96k'
+		]
 	],
-	mp4: [
-		'-c:v',
-		'libx264',
-		'-crf',
-		'23',
-		'-preset',
-		'slow',
-		'-pix_fmt',
-		'yuv420p',
-		'-c:a',
-		'aac',
-		'-b:a',
-		'128k',
-		'-movflags',
-		'+faststart'
+	[
+		'mp4',
+		[
+			'-c:v',
+			'libx264',
+			'-crf',
+			'23',
+			'-preset',
+			'slow',
+			'-pix_fmt',
+			'yuv420p',
+			'-c:a',
+			'aac',
+			'-b:a',
+			'128k',
+			'-movflags',
+			'+faststart'
+		]
 	],
-	mp4_hevc: [
-		'-c:v',
-		'libx265',
-		'-crf',
-		'28',
-		'-preset',
-		'slow',
-		'-pix_fmt',
-		'yuv420p',
-		'-c:a',
-		'aac',
-		'-b:a',
-		'128k',
-		'-movflags',
-		'+faststart',
-		'-tag:v',
-		'hvc1'
+	[
+		'mp4_hevc',
+		[
+			'-c:v',
+			'libx265',
+			'-crf',
+			'28',
+			'-preset',
+			'slow',
+			'-pix_fmt',
+			'yuv420p',
+			'-c:a',
+			'aac',
+			'-b:a',
+			'128k',
+			'-movflags',
+			'+faststart',
+			'-tag:v',
+			'hvc1'
+		]
 	]
-};
+]);
 
-export const FORMAT_EXTENSIONS: Record<VideoFormat, string> = {
-	mp4: 'mp4',
-	webm: 'webm',
-	mp4_hevc: 'mp4'
-};
+const FORMAT_EXTENSIONS = new Map<VideoFormat, string>([
+	['mp4', 'mp4'],
+	['webm', 'webm'],
+	['mp4_hevc', 'mp4']
+]);
 
-export const FORMAT_MIME_TYPES: Record<VideoFormat, string> = {
-	mp4: 'video/mp4',
-	webm: 'video/webm',
-	mp4_hevc: 'video/mp4'
-};
+/**
+ * MIME types with codec parameters for `<source type="...">`.
+ * Including codec strings lets browsers reject unsupported formats before
+ * downloading the file. H.264/mp4 is omitted because libx264 can produce
+ * varying profiles — an incorrect codec string breaks more than it helps
+ * for a universally-supported format.
+ *
+ * To add a new format: add its `VideoFormat` key and its full MIME type here.
+ */
+export const FORMAT_MIME_TYPES = new Map<VideoFormat, string>([
+	['mp4', 'video/mp4'],
+	['webm', 'video/webm; codecs="vp9"'],
+	['mp4_hevc', 'video/mp4; codecs="hvc1"']
+]);
 
-const FORMAT_SUFFIXES: Partial<Record<VideoFormat, string>> = {
-	mp4_hevc: 'hevc'
-};
+const FORMAT_SUFFIXES = new Map<VideoFormat, string>([['mp4_hevc', 'hevc']]);
 
-export interface EncodeOptions {
-	resolutions: number[];
-	formats: VideoFormat[];
-	cacheDirectory: string;
-}
-
-export interface EncodedFile {
-	format: VideoFormat;
-	resolution: number;
-	filePath: string;
-	fileName: string;
-}
+const BYTES_PER_KILOBYTE = 1024;
+const BYTES_PER_MEGABYTE = BYTES_PER_KILOBYTE * BYTES_PER_KILOBYTE;
+const FFMPEG_STDERR_MAX_MEGABYTES = 100;
+/** Generous upper bound for FFmpeg stderr progress output on long-form video (>6 min). */
+const FFMPEG_MAX_BUFFER_BYTES = FFMPEG_STDERR_MAX_MEGABYTES * BYTES_PER_MEGABYTE;
 
 export interface BuildOutputFileNameOptions {
 	baseName: string;
@@ -101,6 +108,7 @@ export interface EncodeVideoOptions {
 	outputPath: string;
 	resolution: number;
 	format: VideoFormat;
+	fps: number;
 	ffmpegBin?: string;
 }
 
@@ -111,150 +119,61 @@ export interface EnsureEncodedOptions {
 	resolution: number;
 	format: VideoFormat;
 	cacheDirectory: string;
+	/** Framerate of the source video, from getVideoFps(). */
+	sourceFps: number;
+	/** Optional user-configured fps cap. Effective fps = min(fps, sourceFps). */
+	fps?: number;
 	ffmpegBin?: string;
 }
 
-interface EncoderDeps {
-	exists?: (filePath: string) => boolean;
-	mkdirSync?: (directoryPath: string, options?: { recursive: boolean }) => void;
-	runCommand?: (program: string, arguments_: string[]) => void;
-	log?: (message: string) => void;
-	logError?: (message: string, error: unknown) => void;
-	removeFile?: (filePath: string) => void;
-}
-
 function getFfmpegCodecArguments(format: VideoFormat): string[] {
-	const arguments_ = CODEC_ARGUMENTS[format];
-	if (!arguments_) throw new Error(`Unsupported format: ${format}`);
-	return arguments_;
+	const codecArguments = CODEC_ARGUMENTS.get(format);
+	if (!codecArguments) throw new Error(`Unsupported format: ${format}`);
+	return codecArguments;
 }
 
 export function buildOutputFileName(options: BuildOutputFileNameOptions): string {
 	const { baseName, hash, resolution, format } = options;
-	const suffix = FORMAT_SUFFIXES[format];
-	const extension = FORMAT_EXTENSIONS[format];
+	const suffix = FORMAT_SUFFIXES.get(format);
+	const extension = FORMAT_EXTENSIONS.get(format);
+	if (!extension) throw new Error(`Unsupported format: ${format}`);
 	const stem = suffix
 		? `${baseName}_${hash}_${resolution}p_${suffix}`
 		: `${baseName}_${hash}_${resolution}p`;
 	return `${stem}.${extension}`;
 }
 
-export function encodeVideo(
-	videoOptions: EncodeVideoOptions,
-	run: (program: string, arguments_: string[]) => void = (program, arguments_) =>
-		execFileSync(program, arguments_, { stdio: 'inherit' })
-): void {
-	const { inputPath, outputPath, resolution, format } = videoOptions;
+function buildFfmpegArguments(videoOptions: EncodeVideoOptions): string[] {
+	const { inputPath, outputPath, resolution, format, fps } = videoOptions;
 	const codecArguments = getFfmpegCodecArguments(format);
-	const arguments_ = [
+	const containerFormat = FORMAT_EXTENSIONS.get(format) as string;
+	return [
 		'-i',
 		inputPath,
 		'-vf',
-		`scale=-2:${resolution},fps=30`,
+		`scale=-2:${resolution},fps=${fps}`,
 		...codecArguments,
+		'-f',
+		containerFormat,
 		'-y',
 		outputPath
 	];
-	run(videoOptions.ffmpegBin ?? 'ffmpeg', arguments_);
 }
 
-export function getLockFilePath(cachedPath: string): string {
-	return `${cachedPath}.lock`;
+export async function encodeVideoAsync(
+	videoOptions: EncodeVideoOptions,
+	run?: (program: string, commandArguments: string[]) => Promise<void>
+): Promise<void> {
+	const program = videoOptions.ffmpegBin ?? 'ffmpeg';
+	const commandArguments = buildFfmpegArguments(videoOptions);
+	await (run
+		? run(program, commandArguments)
+		: execFileAsync(program, commandArguments, { maxBuffer: FFMPEG_MAX_BUFFER_BYTES }));
 }
 
-export interface VideoHeightDeps {
-	ffprobeBin?: string;
-	readCommand?: (program: string, arguments_: string[]) => string;
-}
-
-export function getVideoHeight(inputPath: string, deps: VideoHeightDeps = {}): number {
-	const readCommand =
-		deps.readCommand ??
-		((program: string, arguments_: string[]) => execFileSync(program, arguments_).toString());
-	const output = readCommand(deps.ffprobeBin ?? 'ffprobe', [
-		'-v',
-		'error',
-		'-select_streams',
-		'v:0',
-		'-show_entries',
-		'stream=height',
-		'-of',
-		'csv=p=0',
-		inputPath
-	]).trim();
-	const height = Number.parseInt(output, 10);
-	if (Number.isNaN(height)) throw new Error(`Could not determine video height for: ${inputPath}`);
-	return height;
-}
+export { getVideoHeight, getVideoFps, getVideoInfo } from './video-probe';
+export type { VideoProbeDeps, VideoHeightDeps, VideoInfo } from './video-probe';
 
 export function filterApplicableResolutions(resolutions: number[], sourceHeight: number): number[] {
 	return resolutions.filter((resolution) => resolution <= sourceHeight);
-}
-
-export async function encodeVideoAsync(videoOptions: EncodeVideoOptions): Promise<void> {
-	const { inputPath, outputPath, resolution, format } = videoOptions;
-	const codecArguments = getFfmpegCodecArguments(format);
-	const arguments_ = [
-		'-i',
-		inputPath,
-		'-vf',
-		`scale=-2:${resolution},fps=30`,
-		...codecArguments,
-		'-y',
-		outputPath
-	];
-	await execFileAsync(videoOptions.ffmpegBin ?? 'ffmpeg', arguments_);
-}
-
-/**
- * Ensures a video file is encoded to the requested format and resolution,
- * using a file-system cache to avoid re-encoding on subsequent builds.
- *
- * **Build-time only.** This function is synchronous and intended for use inside
- * Rollup/Vite `load` hooks. On a cache hit it returns immediately. On a miss it
- * runs FFmpeg synchronously and returns the cached output path.
- *
- * If FFmpeg fails mid-encode, the partial output file is deleted and the error
- * is re-thrown so the build pipeline receives a meaningful failure rather than
- * a confusing ENOENT when Rollup tries to read the missing file.
- *
- * All I/O operations are injectable via `deps` for unit-testing without touching
- * the real file system or spawning real processes.
- */
-export function ensureEncoded(encodeOptions: EnsureEncodedOptions, deps: EncoderDeps = {}): string {
-	const { inputPath, baseName, hash, resolution, format, cacheDirectory, ffmpegBin } =
-		encodeOptions;
-	const {
-		exists = fs.existsSync,
-		mkdirSync = fs.mkdirSync,
-		runCommand,
-		log = console.log,
-		logError = console.error,
-		removeFile = (filePath: string) => fs.rmSync(filePath, { force: true })
-	} = deps;
-
-	mkdirSync(cacheDirectory, { recursive: true });
-
-	const fileName = buildOutputFileName({ baseName, hash, resolution, format });
-	const cachedPath = path.join(cacheDirectory, fileName);
-	const lockPath = getLockFilePath(cachedPath);
-
-	if (exists(cachedPath) && !exists(lockPath)) {
-		log(`[video-plugin] cache hit ${fileName}`);
-	} else {
-		if (exists(lockPath)) {
-			removeFile(lockPath);
-			if (exists(cachedPath)) removeFile(cachedPath);
-		}
-		log(`[video-plugin] encoding ${fileName} -> ${cachedPath}`);
-		try {
-			encodeVideo({ inputPath, outputPath: cachedPath, resolution, format, ffmpegBin }, runCommand);
-		} catch (error) {
-			logError(`[video-plugin] ffmpeg failed for ${fileName}:`, error);
-			removeFile(cachedPath);
-			throw error;
-		}
-	}
-
-	return cachedPath;
 }

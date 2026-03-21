@@ -1,14 +1,10 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import {
-	ensureEncoded,
-	buildOutputFileName,
-	getVideoHeight,
-	filterApplicableResolutions
-} from './encoder';
+import { getVideoInfo, filterApplicableResolutions } from './encoder';
+import { ensureEncoded } from './development-encoder';
 import { resolveAssets, renderExportObject } from './assets';
-import type { EmitFileFunction, ResolvedAsset } from './assets';
+import { buildEnsureEncodedOptions } from './encode-options';
 import type { VideoParameters } from './plugin-types';
 import { HASH_SLICE_LENGTH } from './plugin-types';
 
@@ -17,87 +13,96 @@ export interface InputContext {
 	baseName: string;
 	hash: string;
 	applicableResolutions: number[];
+	sourceFps: number;
 }
 
-export interface ClientBuildDeps {
-	emitFile: EmitFileFunction;
-	onEmitted: (cachedPath: string, referenceId: string) => void;
+export interface BuildDeps {
+	copyFile: (source: string, destination: string) => void;
+	base: string;
+	assetsDirectory: string;
+	outDirectory: string;
 	inputContextCache: Map<string, InputContext>;
+	warn: (message: string) => void;
+	log: (message: string) => void;
+	logError: (message: string, error: unknown) => void;
 }
 
-export interface SsrBuildDeps {
-	inputContextCache: Map<string, InputContext>;
-	clientAssetUrls: Map<string, string>;
+/**
+ * Returns a fast cache fingerprint for a video file using mtime + size + fps cap.
+ * Avoids reading file content (which can be GBs) while still detecting
+ * file replacement reliably. Including fps ensures a changed fps option
+ * produces a different cache key and triggers a fresh encode.
+ */
+function computeFileFingerprint(filePath: string, fps?: number): string {
+	const stat = fs.statSync(filePath);
+	return crypto
+		.createHash('sha256')
+		.update(`${stat.mtimeMs}:${stat.size}:${fps ?? ''}`)
+		.digest('hex')
+		.slice(0, HASH_SLICE_LENGTH);
 }
 
-function getFileHash(filePath: string): string {
-	const buffer = fs.readFileSync(filePath);
-	return crypto.createHash('sha256').update(buffer).digest('hex').slice(0, HASH_SLICE_LENGTH);
-}
-
-export function resolveInputContext(cleanId: string, parameters: VideoParameters): InputContext {
-	const inputPath = path.isAbsolute(cleanId) ? cleanId : path.resolve(process.cwd(), cleanId);
-	const hash = getFileHash(inputPath);
-	const baseName = path.basename(cleanId, path.extname(cleanId));
-	const applicableResolutions = filterApplicableResolutions(
-		parameters.resolutions,
-		getVideoHeight(inputPath, { ffprobeBin: parameters.ffprobeBin })
-	);
-	return { inputPath, baseName, hash, applicableResolutions };
-}
-
-export function handleBuildLoad(
+export function resolveInputContext(
 	cleanId: string,
 	parameters: VideoParameters,
-	deps: ClientBuildDeps
-): string {
-	const inputContext = resolveInputContext(cleanId, parameters);
-	deps.inputContextCache.set(cleanId, inputContext);
-	const { inputPath, baseName, hash, applicableResolutions } = inputContext;
-	const { formats, cacheDirectory, ffmpegBin } = parameters;
+	warn?: (message: string) => void
+): InputContext {
+	const inputPath = path.isAbsolute(cleanId) ? cleanId : path.resolve(process.cwd(), cleanId);
+	const hash = computeFileFingerprint(inputPath, parameters.fps);
+	const baseName = path.basename(cleanId, path.extname(cleanId));
+	const probeDeps = { ffprobeBin: parameters.ffprobeBin };
+	const videoInfo = getVideoInfo(inputPath, probeDeps);
+	const applicableResolutions = filterApplicableResolutions(
+		parameters.resolutions,
+		videoInfo.height
+	);
+	if (applicableResolutions.length === 0) {
+		warn?.(
+			`[svelte-enhanced-video] "${baseName}" source resolution is smaller than all configured ` +
+				`resolutions (${parameters.resolutions.join(', ')}p) — no <source> elements will be generated.`
+		);
+	}
+	const sourceFps = videoInfo.fps;
+	return { inputPath, baseName, hash, applicableResolutions, sourceFps };
+}
+
+export async function handleBuildLoad(
+	cleanId: string,
+	parameters: VideoParameters,
+	deps: BuildDeps
+): Promise<string> {
+	const cached = deps.inputContextCache.get(cleanId);
+	const inputContext = cached ?? resolveInputContext(cleanId, parameters, deps.warn);
+	if (!cached) deps.inputContextCache.set(cleanId, inputContext);
+	const { inputPath, baseName, hash, applicableResolutions, sourceFps } = inputContext;
+	const { formats, cacheDirectory, ffmpegBin, fps } = parameters;
 	const cachedPaths = new Map<string, string>();
 	for (const format of formats) {
 		for (const resolution of applicableResolutions) {
-			const cachedPath = ensureEncoded(
-				{ inputPath, baseName, hash, resolution, format, cacheDirectory, ffmpegBin },
-				{}
+			const cachedPath = await ensureEncoded(
+				buildEnsureEncodedOptions({
+					context: { inputPath, baseName, hash, sourceFps },
+					parameters: { cacheDirectory, ffmpegBin, fps },
+					format,
+					resolution
+				}),
+				{ log: deps.log, logError: deps.logError, throwOnError: true }
 			);
 			cachedPaths.set(`${format}_${resolution}p`, cachedPath);
 		}
 	}
-	const trackingEmitFile: EmitFileFunction = (emitOptions) => {
-		const referenceId = deps.emitFile(emitOptions);
-		const cachedPath = [...cachedPaths.values()].find((p) => path.basename(p) === emitOptions.name);
-		if (cachedPath) deps.onEmitted(cachedPath, referenceId);
-		return referenceId;
-	};
-	const assets = resolveAssets(
-		cachedPaths,
-		{ isBuild: true, formats, resolutions: applicableResolutions },
-		trackingEmitFile
-	);
-	return renderExportObject(assets, formats);
-}
 
-export function handleSsrBuildLoad(
-	cleanId: string,
-	parameters: VideoParameters,
-	deps: SsrBuildDeps
-): string {
-	const { formats, cacheDirectory } = parameters;
-	const inputContext =
-		deps.inputContextCache.get(cleanId) ?? resolveInputContext(cleanId, parameters);
-	const { baseName, hash, applicableResolutions } = inputContext;
-	if (deps.clientAssetUrls.size === 0)
-		console.warn('[video-plugin] SSR build ran before client build — no asset URLs available');
-	const assets: ResolvedAsset[] = [];
-	for (const format of formats) {
-		for (const resolution of applicableResolutions) {
-			const fileName = buildOutputFileName({ baseName, hash, resolution, format });
-			const cachedPath = path.join(path.resolve(cacheDirectory), fileName);
-			const url = deps.clientAssetUrls.get(cachedPath);
-			if (url) assets.push({ format, resolution, expression: JSON.stringify(url) });
-		}
+	for (const cachedPath of cachedPaths.values()) {
+		const fileName = path.basename(cachedPath);
+		deps.copyFile(cachedPath, path.join(deps.outDirectory, deps.assetsDirectory, fileName));
 	}
+
+	const assets = resolveAssets(cachedPaths, {
+		isBuild: true,
+		formats,
+		resolutions: applicableResolutions,
+		base: deps.base,
+		assetsDirectory: deps.assetsDirectory
+	});
 	return renderExportObject(assets, formats);
 }

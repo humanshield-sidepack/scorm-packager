@@ -11,6 +11,7 @@ export interface ResolvedBinaries {
 interface BinaryHints {
 	ffmpegPath?: string;
 	ffprobePath?: string;
+	warn?: (message: string) => void;
 }
 
 interface CombinedPackageResult {
@@ -109,6 +110,8 @@ async function tryFfmpegStatic(): Promise<string | undefined> {
 
 async function tryFfprobeStatic(): Promise<string | undefined> {
 	try {
+		// eslint-disable-next-line no-comments/disallowComments
+		// @ts-expect-error - no types available
 		const module_ = (await import('ffprobe-static')) as FfprobeStaticModule;
 		const value = module_.path;
 		return typeof value === 'string' && isExecutable(value) ? value : undefined;
@@ -132,11 +135,15 @@ async function resolveFfmpegBin(
 	throw new Error(FFMPEG_NOT_FOUND_ERROR);
 }
 
-async function resolveFfprobeBin(
-	explicitPath: string | undefined,
-	combined: CombinedPackageResult,
-	ffmpegBin: string
-): Promise<string> {
+interface ResolveFfprobeBinOptions {
+	explicitPath: string | undefined;
+	combined: CombinedPackageResult;
+	ffmpegBin: string;
+	warn: (message: string) => void;
+}
+
+async function resolveFfprobeBin(options: ResolveFfprobeBinOptions): Promise<string> {
+	const { explicitPath, combined, ffmpegBin, warn } = options;
 	if (explicitPath !== undefined) {
 		validateExplicitPath(explicitPath, 'ffprobePath');
 		return explicitPath;
@@ -144,7 +151,7 @@ async function resolveFfprobeBin(
 	if (combined.ffprobe !== undefined) return combined.ffprobe;
 	const fromStatic = await tryFfprobeStatic();
 	if (fromStatic !== undefined) {
-		console.warn(FFPROBE_STATIC_VERSION_WARNING);
+		warn(FFPROBE_STATIC_VERSION_WARNING);
 		return fromStatic;
 	}
 	const sibling = path.join(path.dirname(ffmpegBin), ffprobeNameForPlatform());
@@ -154,8 +161,14 @@ async function resolveFfprobeBin(
 }
 
 export async function resolveBinaries(hints: BinaryHints = {}): Promise<ResolvedBinaries> {
+	const warn = hints.warn ?? (() => {});
 	const combined = await loadCombinedPackage();
 	const ffmpeg = await resolveFfmpegBin(hints.ffmpegPath, combined);
-	const ffprobe = await resolveFfprobeBin(hints.ffprobePath, combined, ffmpeg);
+	const ffprobe = await resolveFfprobeBin({
+		explicitPath: hints.ffprobePath,
+		combined,
+		ffmpegBin: ffmpeg,
+		warn
+	});
 	return { ffmpeg, ffprobe };
 }

@@ -5,10 +5,6 @@ import type { AST } from 'svelte/compiler';
 import { FORMAT_MIME_TYPES } from './encoder';
 import type { VideoFormat } from './encoder';
 
-const FORMAT_MIME_MAP = new Map<VideoFormat, string>(
-	Object.entries(FORMAT_MIME_TYPES) as [VideoFormat, string][]
-);
-
 export interface TransformOptions {
 	resolutions: number[];
 	formats: VideoFormat[];
@@ -48,7 +44,7 @@ function buildSourceTags(
 	for (const format of formats) {
 		for (const resolution of resolutions) {
 			const source = `${importName}.${format}?.["${resolution}p"]`;
-			const mimeType = FORMAT_MIME_MAP.get(format) ?? 'video/mp4';
+			const mimeType = FORMAT_MIME_TYPES.get(format) ?? 'video/mp4';
 			sources += `\n\t\t{#if ${source}}<source src={${source}} type="${mimeType}" size="${resolution}" />{/if}`;
 		}
 	}
@@ -78,6 +74,7 @@ interface VideoElementContext {
 	code: string;
 	node: AST.RegularElement;
 	imports: Map<string, string>;
+	warn: (message: string) => void;
 }
 
 function resolveVideoElementReplacement(
@@ -85,10 +82,10 @@ function resolveVideoElementReplacement(
 	currentIndex: number,
 	options: TransformOptions
 ): string | undefined {
-	const { code, node, imports } = context;
+	const { code, node, imports, warn } = context;
 	const sourceAttributeNode = getAttributeValue(node, 'src');
 	if (!sourceAttributeNode) {
-		console.warn(
+		warn(
 			`[svelte-enhanced-video] <video:enhanced> at position ${node.start} has a dynamic or missing src — ` +
 				`only static string paths are supported. The element will not be enhanced.`
 		);
@@ -97,7 +94,7 @@ function resolveVideoElementReplacement(
 
 	const staticSource = getStaticSource(sourceAttributeNode);
 	if (!staticSource) {
-		console.warn(
+		warn(
 			`[svelte-enhanced-video] <video:enhanced> at position ${node.start} has a dynamic src expression — ` +
 				`only static string literals are supported. The element will not be enhanced.`
 		);
@@ -126,12 +123,13 @@ function injectImportStatements(s: MagicString, ast: AST.Root, importText: strin
 
 export function transformSvelteCode(
 	code: string,
-	options: TransformOptions
+	options: TransformOptions,
+	warn: (message: string) => void = () => {}
 ): { code: string; map: string } | undefined {
 	if (!code.includes('<video:enhanced')) return undefined;
 
 	if (options.formats.length === 0 || options.resolutions.length === 0) {
-		console.warn(
+		warn(
 			`[svelte-enhanced-video] transformSvelteCode called with empty ` +
 				`${options.formats.length === 0 ? 'formats' : 'resolutions'} array — ` +
 				`no <source> elements will be generated.`
@@ -153,7 +151,7 @@ export function transformSvelteCode(
 					return;
 				}
 				const replacement = resolveVideoElementReplacement(
-					{ code, node, imports },
+					{ code, node, imports, warn },
 					tagIndex++,
 					options
 				);

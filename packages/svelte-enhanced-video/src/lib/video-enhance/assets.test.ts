@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { VideoFormat } from './encoder';
-import { developmentUrl, normalizeVideoUrl, resolveAssets, renderExportObject } from './assets';
+import { developmentUrl, resolveAssets, renderExportObject } from './assets';
+import type { ResolvedAsset } from './assets';
 
 const RESOLUTION_HIGH = 1080;
 const RESOLUTION_LOW = 720;
@@ -63,84 +64,106 @@ describe('resolveAssets (build)', () => {
 		isBuild: true,
 		formats: FORMATS,
 		resolutions: RESOLUTIONS,
-		readFile: vi.fn().mockReturnValue(Buffer.from('data')) as unknown as (p: string) => Buffer
+		base: '/',
+		assetsDirectory: 'assets'
 	};
 
-	it('calls emitFile for every asset', () => {
-		const emitFile = vi.fn().mockReturnValue('ref-id');
-		const readFile = vi.fn().mockReturnValue(Buffer.from('data'));
-
-		resolveAssets(makeCachedPaths(), { ...buildOptions, readFile }, emitFile);
-		expect(emitFile).toHaveBeenCalledTimes(FORMATS.length * RESOLUTIONS.length);
+	it('returns one asset per format × resolution', () => {
+		const assets = resolveAssets(makeCachedPaths(), buildOptions);
+		expect(assets).toHaveLength(FORMATS.length * RESOLUTIONS.length);
 	});
 
-	it('produces rollup import.meta expressions in build mode', () => {
-		const emitFile = vi.fn().mockReturnValue('my-ref');
-		const readFile = vi.fn().mockReturnValue(Buffer.from('data'));
-
-		const assets = resolveAssets(makeCachedPaths(), { ...buildOptions, readFile }, emitFile);
-		for (const asset of assets) {
-			expect(asset.expression).toBe('import.meta.ROLLUP_FILE_URL_my-ref');
-		}
+	it('produces a JSON-string web URL using base + assetsDirectory + filename', () => {
+		const assets = resolveAssets(makeCachedPaths(), buildOptions);
+		const mp4High = assets.find((a) => a.format === 'mp4' && a.resolution === RESOLUTION_HIGH)!;
+		expect(mp4High.expression).toBe('"/assets/video_abc_1080p.mp4"');
 	});
 
-	it('throws if emitFile is not provided in build mode', () => {
-		expect(() => resolveAssets(makeCachedPaths(), buildOptions)).toThrow('emitFile required');
-	});
-});
-
-const NON_STRING_INPUT = 99;
-
-describe('normalizeVideoUrl', () => {
-	it('returns non-string values unchanged', () => {
-		expect(normalizeVideoUrl(NON_STRING_INPUT)).toBe(NON_STRING_INPUT);
-		expect(normalizeVideoUrl(false)).toBe(false);
+	it('uses custom base and assetsDirectory', () => {
+		const assets = resolveAssets(makeCachedPaths(), {
+			...buildOptions,
+			base: '/app/',
+			assetsDirectory: 'static'
+		});
+		const mp4High = assets.find((a) => a.format === 'mp4' && a.resolution === RESOLUTION_HIGH)!;
+		expect(mp4High.expression).toBe('"/app/static/video_abc_1080p.mp4"');
 	});
 
-	it('returns non-file: URLs unchanged', () => {
-		expect(normalizeVideoUrl('/_enhanced-video/video.mp4')).toBe('/_enhanced-video/video.mp4');
-		expect(normalizeVideoUrl('/_app/immutable/assets/video.mp4')).toBe(
-			'/_app/immutable/assets/video.mp4'
-		);
+	it('normalizes base without trailing slash', () => {
+		const assets = resolveAssets(makeCachedPaths(), {
+			...buildOptions,
+			base: '/app',
+			assetsDirectory: 'assets'
+		});
+		const mp4High = assets.find((a) => a.format === 'mp4' && a.resolution === RESOLUTION_HIGH)!;
+		expect(mp4High.expression).toBe('"/app/assets/video_abc_1080p.mp4"');
 	});
 
-	it('strips the file:// prefix and returns the /_app/... web path', () => {
-		const ssrUrl = 'file:///F:/project/.svelte-kit/output/server/_app/immutable/assets/video.mp4';
-		expect(normalizeVideoUrl(ssrUrl)).toBe('/_app/immutable/assets/video.mp4');
+	it('normalizes both base and assetsDirectory slashes', () => {
+		const assets = resolveAssets(makeCachedPaths(), {
+			...buildOptions,
+			base: '/app/',
+			assetsDirectory: '/assets/'
+		});
+		const mp4High = assets.find((a) => a.format === 'mp4' && a.resolution === RESOLUTION_HIGH)!;
+		expect(mp4High.expression).toBe('"/app/assets/video_abc_1080p.mp4"');
 	});
 
-	it('returns a file: URL unchanged when it has no /_app/ segment', () => {
-		expect(normalizeVideoUrl('file:///some/other/path.mp4')).toBe('file:///some/other/path.mp4');
+	it('normalizes root base with slashed assetsDirectory', () => {
+		const assets = resolveAssets(makeCachedPaths(), {
+			...buildOptions,
+			base: '/',
+			assetsDirectory: '/assets/'
+		});
+		const mp4High = assets.find((a) => a.format === 'mp4' && a.resolution === RESOLUTION_HIGH)!;
+		expect(mp4High.expression).toBe('"/assets/video_abc_1080p.mp4"');
+	});
+
+	it('defaults base to "/" and assetsDirectory to "assets" when omitted', () => {
+		const assets = resolveAssets(makeCachedPaths(), {
+			isBuild: true,
+			formats: FORMATS,
+			resolutions: RESOLUTIONS
+		});
+		const mp4High = assets.find((a) => a.format === 'mp4' && a.resolution === RESOLUTION_HIGH)!;
+		expect(mp4High.expression).toBe('"/assets/video_abc_1080p.mp4"');
 	});
 });
 
 describe('renderExportObject', () => {
-	it('includes the __v normalizer helper', () => {
-		const assets = [{ format: 'mp4', resolution: RESOLUTION_HIGH, expression: '"url"' }];
-		expect(renderExportObject(assets, ['mp4'])).toContain('const __v=');
-	});
-
 	it('contains "export default {" in the output', () => {
-		const assets = [{ format: 'mp4', resolution: RESOLUTION_HIGH, expression: '"url"' }];
+		const assets = [
+			{ format: 'mp4', resolution: RESOLUTION_HIGH, expression: '"url"' } satisfies ResolvedAsset
+		];
 		expect(renderExportObject(assets, ['mp4'])).toContain('export default {');
 	});
 
 	it('contains an entry for each format', () => {
 		const assets = [
-			{ format: 'mp4', resolution: RESOLUTION_HIGH, expression: '"url1"' },
-			{ format: 'webm', resolution: RESOLUTION_HIGH, expression: '"url2"' }
+			{ format: 'mp4', resolution: RESOLUTION_HIGH, expression: '"url1"' } satisfies ResolvedAsset,
+			{ format: 'webm', resolution: RESOLUTION_HIGH, expression: '"url2"' } satisfies ResolvedAsset
 		];
 		const output = renderExportObject(assets, ['mp4', 'webm']);
 		expect(output).toContain('"mp4"');
 		expect(output).toContain('"webm"');
 	});
 
-	it('wraps each expression in __v(...) rather than using it verbatim', () => {
+	it('uses the expression directly without any wrapper', () => {
 		const assets = [
-			{ format: 'mp4', resolution: RESOLUTION_HIGH, expression: 'import.meta.ROLLUP_FILE_URL_abc' }
+			{
+				format: 'mp4',
+				resolution: RESOLUTION_HIGH,
+				expression: '"/assets/video.mp4"'
+			} satisfies ResolvedAsset
 		];
 		const output = renderExportObject(assets, ['mp4']);
-		expect(output).toContain('__v(import.meta.ROLLUP_FILE_URL_abc)');
-		expect(output).not.toContain('"import.meta.ROLLUP_FILE_URL_abc"');
+		expect(output).toContain('"1080p": "/assets/video.mp4"');
+	});
+
+	it('does not include a __v normalizer helper', () => {
+		const assets = [
+			{ format: 'mp4', resolution: RESOLUTION_HIGH, expression: '"url"' } satisfies ResolvedAsset
+		];
+		expect(renderExportObject(assets, ['mp4'])).not.toContain('__v');
 	});
 });

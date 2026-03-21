@@ -5,7 +5,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { enhancedVideo } from './src/lib';
 
 export default defineConfig({
-	plugins: [enhancedVideo({ formats: ['mp4'] }), sveltekit(), devtoolsJson()],
+	plugins: [enhancedVideo({ formats: ['mp4'], fps: 30 }), sveltekit(), devtoolsJson()],
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
@@ -22,7 +22,6 @@ export default defineConfig({
 					exclude: ['src/lib/server/**']
 				}
 			},
-
 			{
 				extends: './vite.config.ts',
 				test: {
