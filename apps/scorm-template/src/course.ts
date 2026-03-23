@@ -18,12 +18,10 @@ export const course = defineCourse({
       slides: [
         defineSlide({
           id: 'welcome',
-          source: './course/slides/welcome/WelcomeSlide.svelte',
           component: () => import('./course/slides/welcome/WelcomeSlide.svelte'),
         }),
         defineSlide({
           id: 'course-map',
-          source: './course/slides/overview/CourseMapSlide.svelte',
           component: () => import('./course/slides/overview/CourseMapSlide.svelte'),
         }),
       ],
@@ -35,17 +33,14 @@ export const course = defineCourse({
       slides: [
         defineSlide({
           id: 'score',
-          source: './course/slides/demo/ScoreSlide.svelte',
           component: () => import('./course/slides/demo/ScoreSlide.svelte'),
         }),
         defineSlide({
           id: 'completion',
-          source: './course/slides/demo/CompletionSlide.svelte',
           component: () => import('./course/slides/demo/CompletionSlide.svelte'),
         }),
         defineSlide({
           id: 'summary',
-          source: './course/slides/demo/SummarySlide.svelte',
           component: () => import('./course/slides/demo/SummarySlide.svelte'),
         }),
       ],

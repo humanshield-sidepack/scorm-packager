@@ -4,7 +4,6 @@ export type LayoutComponent = Component<{ children: Snippet }>
 
 export type SlideDefinition = {
   id: string
-  source: string
   component: () => Promise<{ default: Component }>
 }
 

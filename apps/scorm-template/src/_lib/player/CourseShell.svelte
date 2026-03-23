@@ -9,13 +9,13 @@
 	import { course } from "../../course.js";
 
 	onMount(async () => {
-		scormState.initialize();
-		scormState.score._setRange(course.minScore, course.maxScore);
+		const ok = scormState.initialize(course.minScore, course.maxScore);
+		if (!ok) console.error('[CourseShell] SCORM initialization failed');
 		const isResume = scormState.session.entry === "resume";
+		const savedLocation = scormState.location as `/${string}`;
+		const isValidPath = coursePlayer.slides.some((s) => s.pathname === savedLocation);
 		const targetPathname =
-			isResume && scormState.location
-				? (scormState.location as `/${string}`)
-				: coursePlayer.firstPath;
+			isResume && savedLocation && isValidPath ? savedLocation : coursePlayer.firstPath;
 		await coursePlayer.goto(targetPathname);
 	});
 

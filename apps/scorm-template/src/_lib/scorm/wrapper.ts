@@ -94,7 +94,7 @@ export class ScormWrapper {
   setValue(element: string, value: string): boolean {
     if (this.#devStore !== undefined) {
       this.#devStore.set(element, value)
-      this.#persistDevStore()
+      localStorage.setItem(`${DEV_STORAGE_PREFIX}${element}`, value)
       return true
     }
     if (this.#api2004) return this.#api2004.SetValue(element, value) === 'true'
@@ -144,9 +144,4 @@ export class ScormWrapper {
     }
   }
 
-  #persistDevStore(): void {
-    for (const [element, value] of this.#devStore!) {
-      localStorage.setItem(`${DEV_STORAGE_PREFIX}${element}`, value)
-    }
-  }
 }

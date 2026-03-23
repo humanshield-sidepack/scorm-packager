@@ -22,10 +22,16 @@ export class ScoreState {
   }
 
   set raw(value: number) {
-    this.#raw = value
+    const min = this.#min ?? value
+    const max = this.#max ?? value
+    const clamped = Math.min(max, Math.max(min, value))
+    if (clamped !== value) {
+      console.warn(`[ScormState] Score ${value} clamped to [${min}, ${max}]`)
+    }
+    this.#raw = clamped
     this.#wrapper.setValue(
       this.#wrapper.version === '2004' ? SCORM2004.SCORE_RAW : SCORM12.CORE_SCORE_RAW,
-      String(value),
+      String(clamped),
     )
     this.#updateScaled()
     this.#wrapper.commit()
@@ -156,15 +162,26 @@ export class CompletionState {
 
   #loadScorm12Status(wrapper: ScormWrapper): void {
     const raw = wrapper.getValue(SCORM12.CORE_LESSON_STATUS)
-    if (raw === 'passed') {
-      this.#completionStatus = 'completed'
-      this.#successStatus = 'passed'
-    } else if (raw === 'failed') {
-      this.#completionStatus = 'completed'
-      this.#successStatus = 'failed'
-    } else {
-      this.#completionStatus = raw as Scorm2004CompletionStatus
-      this.#successStatus = 'unknown'
+    switch (raw) {
+      case 'passed': {
+        this.#completionStatus = 'completed'
+        this.#successStatus = 'passed'
+        break
+      }
+      case 'failed': {
+        this.#completionStatus = 'completed'
+        this.#successStatus = 'failed'
+        break
+      }
+      case 'completed': {
+        this.#completionStatus = 'completed'
+        this.#successStatus = 'unknown'
+        break
+      }
+      default: {
+        this.#completionStatus = 'incomplete'
+        this.#successStatus = 'unknown'
+      }
     }
   }
 }

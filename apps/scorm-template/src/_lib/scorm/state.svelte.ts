@@ -81,7 +81,7 @@ export class ScormState {
     this.#wrapper.commit()
   }
 
-  initialize(): boolean {
+  initialize(minScore: number, maxScore: number): boolean {
     this.mode = this.#wrapper.connect()
     this.isConnected = true
     const result = this.#wrapper.initialize()
@@ -90,6 +90,7 @@ export class ScormState {
     this.student.load(this.#wrapper)
     this.session.load(this.#wrapper)
     this.score.load(this.#wrapper)
+    this.score._setRange(minScore, maxScore)
     this.completion.load(this.#wrapper)
     const isV2004 = this.#wrapper.version === '2004'
     this.#location = this.#wrapper.getValue(isV2004 ? SCORM2004.LOCATION : SCORM12.CORE_LESSON_LOCATION)
