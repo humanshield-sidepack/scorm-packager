@@ -1,49 +1,90 @@
-import { defineCourse, defineLesson, defineSlide } from '$lib/player/types.js'
-import CourseFrame from './course/layouts/CourseFrame.svelte'
-import LessonFrame from './course/layouts/LessonFrame.svelte'
+import { defineCourse, defineLesson, defineSlide } from "$core/player/types.js";
+import CourseFrame from "./course/layouts/CourseFrame.svelte";
+import LessonFrame from "./course/layouts/LessonFrame.svelte";
 
 export const course = defineCourse({
-  id: 'scorm-template-course',
-  title: 'SCORM Template Course',
-  description: 'A simple SCORM course template.',
+  id: "scorm-template-course",
+  title: "SCORM Template Course",
+  description: "A simple SCORM course template.",
   masteryScore: 80,
   minScore: 0,
   maxScore: 100,
   layout: CourseFrame,
   lessons: [
     defineLesson({
-      id: 'overview',
-      title: 'Overview',
+      id: "overview",
+      title: "Overview",
       layout: LessonFrame,
       slides: [
         defineSlide({
-          id: 'welcome',
-          component: () => import('./course/slides/welcome/WelcomeSlide.svelte'),
+          id: "welcome",
+          title: "Welcome",
+          completionMode: "manual",
+          component: () => import("./course/slides/overview/WelcomeSlide.svx"),
         }),
         defineSlide({
-          id: 'course-map',
-          component: () => import('./course/slides/overview/CourseMapSlide.svelte'),
+          id: "course-progress",
+          title: "Course Progress",
+          component: () =>
+            import("./course/slides/overview/CourseProgressSlide.svx"),
+        }),
+        defineSlide({
+          id: "lesson-tracker",
+          title: "Lesson Tracker",
+          component: () =>
+            import("./course/slides/overview/LessonTrackerSlide.svelte"),
+        }),
+        defineSlide({
+          id: "video-slide-example",
+          title: "Video Slide Example",
+          completionMode: "manual",
+          component: () =>
+            import("./course/slides/overview/VideoCourseSlide.svelte"),
         }),
       ],
     }),
     defineLesson({
-      id: 'demo',
-      title: 'SCORM Demo',
+      id: "quiz",
+      title: "Quiz",
       layout: LessonFrame,
       slides: [
         defineSlide({
-          id: 'score',
-          component: () => import('./course/slides/demo/ScoreSlide.svelte'),
+          id: "multiple-choice",
+          completionMode: "manual",
+          component: () =>
+            import("./course/slides/quiz/MultipleChoiceQuiz.svelte"),
         }),
         defineSlide({
-          id: 'completion',
-          component: () => import('./course/slides/demo/CompletionSlide.svelte'),
+          id: "true-false",
+          completionMode: "manual",
+          component: () => import("./course/slides/quiz/TrueFalseQuiz.svelte"),
+        }),
+      ],
+    }),
+    defineLesson({
+      id: "demo",
+      title: "SCORM Demo",
+      layout: LessonFrame,
+      slides: [
+        defineSlide({
+          id: "score",
+          component: () => import("./course/slides/demo/ScoreSlide.svelte"),
         }),
         defineSlide({
-          id: 'summary',
-          component: () => import('./course/slides/demo/SummarySlide.svelte'),
+          id: "completion",
+          component: () =>
+            import("./course/slides/demo/CompletionSlide.svelte"),
+        }),
+        defineSlide({
+          id: "summary",
+          component: () => import("./course/slides/demo/SummarySlide.svelte"),
+        }),
+        defineSlide({
+          id: "timer-test",
+          title: "Timer Test",
+          component: () => import("./course/slides/demo/TimerTestSlide.svelte"),
         }),
       ],
     }),
   ],
-})
+});

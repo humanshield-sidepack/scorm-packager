@@ -1,0 +1,8 @@
+{
+	"files.associations": {
+		"*.svx": "svelte"
+	},
+	"[svelte]": {
+		"editor.wordWrap": "on"
+	}
+}

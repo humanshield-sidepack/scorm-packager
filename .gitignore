@@ -38,3 +38,4 @@ yarn-error.log*
 *.pem
 .video-cache
 example.txt
+scormdriver.js

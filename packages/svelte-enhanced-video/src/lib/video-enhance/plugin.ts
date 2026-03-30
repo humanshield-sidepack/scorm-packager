@@ -193,7 +193,7 @@ export default function enhancedVideo(options: VideoPluginOptions = {}): Plugin 
 		enforce: 'pre',
 		configureServer(server) {
 			serverReference.current = server;
-			return setupDevelopmentServer(server, pluginConfig.cacheDirectory, runtime.developmentState);
+			setupDevelopmentServer(server, pluginConfig.cacheDirectory, runtime.developmentState);
 		},
 		async configResolved(config) {
 			runtime = await initRuntimeState(pluginConfig, serverReference, config);

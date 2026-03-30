@@ -1,0 +1,58 @@
+<script lang="ts">
+  import {getContext, untrack} from "svelte";
+  import { useSlideCompletion } from "../../../_core/player/index.js";
+
+  let progress = getContext<{ value: number }>("scrollProgress");
+  const completion = useSlideCompletion();
+
+  $effect(() => {
+    if((completion.score || 0) < progress.value && !completion.isPassed) {
+      untrack(() => {
+      console.log("Updating progress to", progress.value);
+      completion.setScore(progress.value);
+      if(progress.value >= 100) {
+        completion.markPassed();
+      }
+      });
+    }
+  });
+</script>
+
+
+
+<div
+  class="prose max-w-[80ch] mx-auto h-screen"
+>
+## Welcome to the svelte scorm template!
+
+This template aims to provide a starting point with tools and examples that will help you create a custom SCORM course using svelte.
+
+```javascript
+import { scormState } from "$core/scorm/index.js";
+import { coursePlayer } from "$core/player/index.js";
+```
+This Slide is Markdown enabled, so you can write your content in markdown, it uses `mdsvex` under the hood. so you can your 
+
+### Heading 3
+
+### Heading 4
+
+**Unordered lists**
+- Item 1
+- Item 2
+- Item 3
+
+**Ordered lists**
+1. Item 1
+2. Item 2
+3. Item 3
+
+**Images** 
+![Image](https://media1.tenor.com/m/TlfAvuz0tLMAAAAC/obi-wan-kenobi-these-are-not-the-droids.gif)
+
+It could also be extended via plugins like `remark-math` and `rehype-katex` `shiki` and many plugins that you can find in the `mdsvex` documentation.
+
+To enable Markdown support without losing all the goods of svelte, just name your slide/course/component with the `.svx` extension and you are good to go!
+
+</div>
+

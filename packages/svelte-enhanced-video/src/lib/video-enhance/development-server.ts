@@ -100,7 +100,7 @@ export function setupDevelopmentServer(
 	server: ViteDevServer,
 	cacheDirectory: string,
 	state: DevelopmentLoadState
-): () => void {
+): void {
 	const resolvedCacheDirectory = path.resolve(cacheDirectory);
 	const onReady = () => triggerReload(server, state.pendingModuleIds);
 	const poll = createPollCallback(state, onReady);
@@ -110,7 +110,5 @@ export function setupDevelopmentServer(
 	if (server.httpServer) {
 		server.httpServer.once('close', dispose);
 	}
-	return () => {
-		server.middlewares.use(createVideoMiddleware(resolvedCacheDirectory, state.originalFiles));
-	};
+	server.middlewares.use(createVideoMiddleware(resolvedCacheDirectory, state.originalFiles));
 }

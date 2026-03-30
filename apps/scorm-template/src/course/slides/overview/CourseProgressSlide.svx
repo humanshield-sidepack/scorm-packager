@@ -1,0 +1,142 @@
+<script lang="ts">
+  import { coursePlayer } from "$core/player/index.js";
+  import Progress from "$lib/components/ui/progress/progress.svelte";
+</script>
+
+<div class="prose max-w-[80ch] mx-auto px-4">
+
+## Course Progress
+
+<div class="not-prose rounded-lg border bg-card p-5 space-y-4">
+  <div class="flex items-center justify-between text-sm">
+    <span class="text-muted-foreground">Overall Progress</span>
+    <span class="font-medium">{coursePlayer.course.progress}%</span>
+  </div>
+  <Progress value={coursePlayer.course.progress} class="h-2" />
+  <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+    <div>
+      <p class="text-xs text-muted-foreground">Current Slide</p>
+      <p class="text-xl font-bold">
+        {coursePlayer.course.slideNumber}<span class="text-sm font-normal text-muted-foreground">/{coursePlayer.course.totalSlides}</span>
+      </p>
+    </div>
+    <div>
+      <p class="text-xs text-muted-foreground">Slides Completed</p>
+      <p class="text-xl font-bold">{coursePlayer.course.slidesCompleted}</p>
+    </div>
+    <div>
+      <p class="text-xs text-muted-foreground">Current Lesson</p>
+      <p class="text-xl font-bold">
+        {coursePlayer.course.lessonNumber}<span class="text-sm font-normal text-muted-foreground">/{coursePlayer.course.totalLessons}</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+### How Progress Works
+
+Progress is calculated as the **percentage of slides with a `"passed"` status**, not just slides that have been visited. A slide can be in one of four states:
+
+- **not attempted** — The learner has never navigated to this slide
+- **incomplete** — The slide has been visited but not yet completed (only for `manual` completion mode)
+- **passed** — The slide is considered complete
+- **failed** — The slide was attempted but the learner did not meet the criteria
+
+Only slides with `"passed"` status count toward progress. This means a learner who visits every slide but doesn't complete the required actions will still show 0% progress.
+
+### Completion Modes
+
+Each slide has a `completionMode` that determines how it transitions to `"passed"`:
+
+**`"auto"` (default)** — The slide is automatically marked as `"passed"` when the learner navigates to it. This is the simplest mode and works well for informational slides that just need to be viewed.
+
+**`"manual"`** — The slide starts as `"incomplete"` on first visit. Your slide component is responsible for marking it as passed using the `useSlideCompletion` hook:
+
+```typescript
+import { useSlideCompletion } from "$core/player";
+
+const completion = useSlideCompletion();
+
+// Read status (reactive)
+completion.status;    // "not attempted" | "incomplete" | "passed" | "failed"
+completion.isPassed;  // boolean
+completion.isFailed;  // boolean
+completion.score;     // number | undefined
+
+// Write status
+completion.markPassed();
+completion.markFailed();
+completion.markPassedWithScore(85);
+```
+
+Set the completion mode in your course definition:
+
+```typescript
+defineSlide({
+  id: "my-quiz",
+  completionMode: "manual",
+  component: () => import("./MyQuiz.svelte"),
+});
+```
+
+### Reading Status Without the Hook
+
+The `useSlideCompletion` hook freezes to the active slide at call time — it's designed for slide components that need to read and write their own status.
+
+For **layouts and containers** that need to track status as the user navigates between slides, use `coursePlayer.activeSlide` directly:
+
+```typescript
+import { coursePlayer } from "$core/player";
+
+// These update reactively as the user navigates AND as status changes
+coursePlayer.activeSlide?.status;
+coursePlayer.activeSlide?.isPassed;
+coursePlayer.activeSlide?.isFailed;
+coursePlayer.activeSlide?.score;
+```
+
+### Scores
+
+There are two separate score concepts — **slide scores** and **course score** — and they are completely independent.
+
+**Slide scores** are optional metadata you can attach to individual slides via `completion.markPassedWithScore(score)`. These are useful for tracking how a learner performed on a specific quiz or exercise, but they do **not** feed into the overall course score automatically. Nothing is aggregated for you.
+
+**Course score** is what gets reported to the LMS. It is entirely **your responsibility** to calculate and report it using `scormState.score`:
+
+```typescript
+import { scormState } from "$core/scorm";
+
+// You decide what the course score is and when to set it
+scormState.score.raw = 85;
+scormState.score.min = 0;
+scormState.score.max = 100;
+```
+
+The `masteryScore` in your course definition tells the SCORM runtime what threshold determines pass/fail for the **course** — if the reported `score.raw` meets or exceeds it, the course status is set to `"passed"`:
+
+```typescript
+defineCourse({
+  masteryScore: 80,  // course passes when score.raw >= 80
+  minScore: 0,
+  maxScore: 100,
+  // ...
+});
+```
+
+How you calculate and report that score is up to you — average quiz scores, weighted totals, a single final exam, or anything else your course requires.
+
+### Persistent Storage
+
+All slide statuses, scores, and interaction data are persisted through the SCORM data model. In **LMS mode**, this data is stored by the LMS and survives browser sessions. In **dev mode**, it uses `sessionStorage` so you can test without an LMS.
+
+The `scormState.store` provides low-level access to the persistent data layer if you need to store custom data beyond slide completion:
+
+```typescript
+import { scormState } from "$core/scorm";
+
+// Store/retrieve custom key-value data
+scormState.store.setObject("my-key", { foo: "bar" });
+const data = scormState.store.getObject<{ foo: string }>("my-key");
+```
+
+</div>

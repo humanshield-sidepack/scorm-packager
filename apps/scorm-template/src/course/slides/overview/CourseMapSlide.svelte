@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { coursePlayer } from '$lib/player/index.js'
+  import { coursePlayer } from "$core/player/index.js";
 </script>
 
 <article>

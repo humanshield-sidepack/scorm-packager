@@ -1,5 +1,7 @@
 <script lang="ts">
-  import CourseShell from '$lib/player/CourseShell.svelte'
+  import { ModeWatcher } from "mode-watcher";
+  import CourseShell from "$core/player/CourseShell.svelte";
 </script>
 
+<ModeWatcher />
 <CourseShell />

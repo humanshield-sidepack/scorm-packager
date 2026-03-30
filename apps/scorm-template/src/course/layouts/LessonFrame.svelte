@@ -1,44 +1,42 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte'
-  import { coursePlayer } from '$lib/player/player.svelte.js'
+  import type { Snippet } from "svelte";
+  import { coursePlayer } from "$core/player/player.svelte.js";
+  import Button from "$lib/components/ui/button/button.svelte";
+  import { scrollProgress } from "$lib/attachments/scroll-progress.svelte.js";
 
-  let { children }: { children: Snippet } = $props()
+  let { children }: { children: Snippet } = $props();
+
+  const trackScroll = scrollProgress();
 </script>
 
-<div class="lesson-frame">
-  <header class="lesson-header">
-    <h2>{coursePlayer.activeSlide?.lessonTitle}</h2>
-  </header>
-  <div class="lesson-content">
+<div class="fullscreenMinusHeader flex flex-col gap-4">
+  <div class="flex-1 overflow-y-scroll" {@attach trackScroll}>
     {@render children()}
   </div>
-  <nav class="lesson-nav">
-    <button disabled={coursePlayer.isFirst} onclick={() => coursePlayer.goPrevious()}>Previous</button>
-    <button disabled={coursePlayer.isLast} onclick={() => coursePlayer.goNext()}>Next</button>
-  </nav>
+  <!-- 
+    With the help of the course player you can handle and manage navigation from outside the slides
+  -->
+  <footer class="flex justify-between border-t px-4 pt-4">
+    <Button
+      size="lg"
+      disabled={!coursePlayer.canGoPrevious}
+      onclick={() => coursePlayer.goPrevious()}
+      class="px-6"
+    >
+      Previous Slide
+    </Button>
+    <Button
+      size="lg"
+      disabled={!coursePlayer.activeSlide?.isPassed ||
+        coursePlayer.activeSlide?.isFailed}
+      onclick={() => coursePlayer.goNext()}
+      class="px-6">Next Slide</Button
+    >
+  </footer>
 </div>
 
 <style>
-  .lesson-frame {
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    height: 100%;
-  }
-  .lesson-header {
-    padding: 1rem 0;
-    border-bottom: 1px solid #e2e8f0;
-  }
-  .lesson-header h2 {
-    margin: 0;
-    font-size: 1.25rem;
-  }
-  .lesson-content {
-    padding: 1rem 0;
-  }
-  .lesson-nav {
-    display: flex;
-    gap: 0.5rem;
-    padding: 1rem 0;
-    border-top: 1px solid #e2e8f0;
+  .fullscreenMinusHeader {
+    height: calc(100vh - 96px);
   }
 </style>

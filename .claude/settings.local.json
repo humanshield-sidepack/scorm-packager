@@ -1,47 +1,48 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(pnpm install:*)",
-      "Bash(pnpm build:*)",
-      "Bash(pnpm exec:*)",
-      "Bash(pnpm --filter svelte-enhanced-video lint)",
-      "mcp__plugin_svelte_svelte__svelte-autofixer",
-      "Bash(npx vitest:*)",
-      "Bash(npx eslint:*)",
-      "WebSearch"
-    ]
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/lint-loop.mjs"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/protect-eslint.mjs"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/protect-eslint-bash.mjs"
-          }
-        ]
-      }
-    ]
-  }
+	"permissions": {
+		"allow": [
+			"Bash(pnpm install:*)",
+			"Bash(pnpm build:*)",
+			"Bash(pnpm exec:*)",
+			"Bash(pnpm --filter svelte-enhanced-video lint)",
+			"mcp__plugin_svelte_svelte__svelte-autofixer",
+			"Bash(npx vitest:*)",
+			"Bash(npx eslint:*)",
+			"mcp__plugin_svelte_svelte__get-documentation",
+			"Bash(pnpm check:*)"
+		]
+	},
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node .claude/hooks/lint-loop.mjs"
+					}
+				]
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node .claude/hooks/protect-eslint.mjs"
+					}
+				]
+			},
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node .claude/hooks/protect-eslint-bash.mjs"
+					}
+				]
+			}
+		]
+	}
 }
