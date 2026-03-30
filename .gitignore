@@ -39,3 +39,8 @@ yarn-error.log*
 .video-cache
 example.txt
 scormdriver.js
+
+scorm-template-12
+a.json
+docker-compose.yml
+*.tgz
