@@ -2,6 +2,15 @@
 	"name": "vite-plugin-scorm",
 	"version": "0.0.1",
 	"type": "module",
+	"repository": {
+		"url": "https://github.com/humanshield-sidepack/scorm-packager",
+		"type": "git"
+	},
+	"author": {
+		"name": "Rachid Boudjelida",
+		"email": "rachidboudjelida@gmail.com"
+	},
+	"homepage": "https://github.com/humanshield-sidepack/scorm-packager/blob/master/packages/vite-plugin-scorm/readme.md",
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",

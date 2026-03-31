@@ -44,3 +44,5 @@ scorm-template-12
 a.json
 docker-compose.yml
 *.tgz
+
+*.zip

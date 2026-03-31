@@ -1,6 +1,15 @@
 {
 	"name": "svelte-enhanced-video",
 	"version": "0.0.1",
+	"repository": {
+		"url": "https://github.com/humanshield-sidepack/scorm-packager",
+		"type": "git"
+	},
+	"author": {
+		"name": "Rachid Boudjelida",
+		"email": "rachidboudjelida@gmail.com"
+	},
+	"homepage": "https://github.com/humanshield-sidepack/scorm-packager/blob/master/packages/svelte-enhanced-video/README.md",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && svelte-kit sync && svelte-package && publint && pnpm run check:esm-imports && pnpm run check:dist-import",

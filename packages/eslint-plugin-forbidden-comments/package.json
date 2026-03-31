@@ -1,9 +1,18 @@
 {
 	"name": "eslint-plugin-forbidden-comments",
-	"version": "1.0.0",
-	"description": "ESLint plugin to disallow comment blocks — prevents comments from leaking into production code",
+	"version": "0.0.1",
+	"description": "ESLint plugin to disallow comment blocks — prevents comments from leaking into production code and prevents LLMs from over commenting code.",
 	"type": "module",
 	"license": "MIT",
+	"repository": {
+		"url": "https://github.com/humanshield-sidepack/scorm-packager",
+		"type": "git"
+	},
+	"author": {
+		"name": "Rachid Boudjelida",
+		"email": "rachidboudjelida@gmail.com"
+	},
+	"homepage": "https://github.com/humanshield-sidepack/scorm-packager/tree/master/packages/eslint-plugin-forbidden-comments",
 	"keywords": [
 		"eslint",
 		"eslint-plugin",

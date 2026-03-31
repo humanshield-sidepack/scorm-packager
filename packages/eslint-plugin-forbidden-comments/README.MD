@@ -1,10 +1,14 @@
-# @repo/eslint-plugin-forbidden-comments
+# eslint-plugin-forbidden-comments
 
 Prevents leaving comment blocks in source files. Designed for projects where comments should not reach production — e.g. when code is not processed by a bundler.
 
 ## Why?
 
 Without a bundler stripping comments, notes, commented-out code blocks, or sensitive information can leak into production.
+
+### LLM-generated code
+
+LLMs produce excessive, low-value comments (`// initialize the array`, `// return the result`, `// handle error`). Prompt instructions like "don't write comments" work initially, but LLM context windows are finite -- when the conversation grows long enough to trigger memory compaction, those instructions are among the first to be discarded, and the LLM reverts to its default commenting habits. An ESLint rule is a hard constraint that cannot be forgotten, compacted away, or ignored. Every comment triggers a lint error that the LLM must resolve by making the code self-documenting instead.
 
 ## Installation
 
@@ -22,12 +26,12 @@ pnpm add -D eslint-plugin-forbidden-comments
 import forbiddenComments from "eslint-plugin-forbidden-comments";
 
 export default [
-  {
-    plugins: { "forbidden-comments": forbiddenComments },
-    rules: {
-      "forbidden-comments/disallowComments": "error",
-    },
-  },
+	{
+		plugins: { "forbidden-comments": forbiddenComments },
+		rules: {
+			"forbidden-comments/disallowComments": "error",
+		},
+	},
 ];
 ```
 
@@ -93,7 +97,9 @@ Set to `false` to forbid them:
 Array of regex pattern strings. A comment matching any pattern is allowed. Defaults to permitting `eslint` and `global` directive comments regardless of this option.
 
 ```js
-{ allow: ["eslint", "global", "copyright"] }
+{
+	allow: ["eslint", "global", "copyright"];
+}
 ```
 
 ## Rule details
@@ -102,7 +108,7 @@ Array of regex pattern strings. A comment matching any pattern is allowed. Defau
 
 ```js
 // import { foo } from './foo'
-const { foo } = require('./foo');
+const { foo } = require("./foo");
 ```
 
 ```js
@@ -112,7 +118,7 @@ const { foo } = require('./foo');
 ```
 
 ```js
-const client = require('cool-package') // TO-DO fix vulnerability
+const client = require("cool-package"); // TO-DO fix vulnerability
 ```
 
 ```html
