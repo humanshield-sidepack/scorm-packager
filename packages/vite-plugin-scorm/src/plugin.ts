@@ -19,18 +19,6 @@ function resolveVersions(target: ScormPackagerOptions['target']): string[] {
 	return ['1.2', '2004']
 }
 
-function resolveAliases(
-	config: ResolvedConfig,
-): { find: string | RegExp; replacement: string }[] {
-	const aliases = config.resolve?.alias
-	if (!aliases) return []
-	if (Array.isArray(aliases)) return aliases
-	return Object.entries(aliases as Record<string, string>).map(([find, replacement]) => ({
-		find,
-		replacement,
-	}))
-}
-
 async function ensureExists(filePath: string, message: string): Promise<void> {
 	try {
 		await fs.access(filePath)
@@ -53,27 +41,26 @@ export function scormPackager(userOptions: ScormPackagerOptions = {}): Plugin {
 		async closeBundle() {
 			const courseFile = userOptions.courseFile ?? DEFAULT_COURSE_FILE
 			const entry = userOptions.entry ?? DEFAULT_ENTRY
-			const outputDir = userOptions.outputDir ?? DEFAULT_OUTPUT_DIR
+			const outputDirectory = userOptions.outputDir ?? DEFAULT_OUTPUT_DIR
 
 			const root = resolvedConfig.root
-			const distDir = path.resolve(root, resolvedConfig.build.outDir ?? 'dist')
+			const distributionDirectory = path.resolve(root, resolvedConfig.build.outDir ?? 'dist')
 			const courseFilePath = path.resolve(root, courseFile)
-			const outputDirPath = path.resolve(root, outputDir)
+			const outputDirectoryPath = path.resolve(root, outputDirectory)
 
-			await ensureExists(distDir, `Build output not found at: ${distDir}`)
+			await ensureExists(distributionDirectory, `Build output not found at: ${distributionDirectory}`)
 			await ensureExists(courseFilePath, `Course file not found at: ${courseFilePath}`)
 
-			const aliases = userOptions.loadCourse ? [] : resolveAliases(resolvedConfig)
 			const metadata = userOptions.loadCourse
 				? await userOptions.loadCourse(root)
-				: await extractCourseMetadata(courseFilePath, aliases)
+				: await extractCourseMetadata(courseFilePath, resolvedConfig)
 
 			await ensureExists(
-				path.join(distDir, entry),
+				path.join(distributionDirectory, entry),
 				`Entry "${entry}" not found in build output.`,
 			)
 
-			const distFiles = await collectDistributionFiles(distDir)
+			const distributionFiles = await collectDistributionFiles(distributionDirectory)
 
 			const registry = createFormatRegistry()
 			registry.set('1.2', scorm12Handler)
@@ -83,8 +70,8 @@ export function scormPackager(userOptions: ScormPackagerOptions = {}): Plugin {
 			for (const version of versions) {
 				const handler = registry.get(version)
 				if (!handler) continue
-				const { manifest, suffix } = handler({ metadata, entry, distFiles })
-				const outputPath = await buildZip({ metadata, distFiles, manifest, suffix, outputDir: outputDirPath })
+				const { manifest, suffix } = handler({ metadata, entry, distFiles: distributionFiles })
+				const outputPath = await buildZip({ metadata, distFiles: distributionFiles, manifest, suffix, outputDir: outputDirectoryPath })
 				this.info(`[vite-plugin-scorm] Created: ${outputPath}`)
 			}
 		},

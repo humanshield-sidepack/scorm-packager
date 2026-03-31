@@ -1,65 +1,27 @@
 import fs from 'node:fs/promises'
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
 import { pathToFileURL } from 'node:url'
-import type { Plugin as EsbuildPlugin, PluginBuild } from 'esbuild'
+import { build, type Plugin as VitePlugin, type ResolvedConfig, type Rollup } from 'vite'
 import type { CourseMetadata } from './types.js'
 import { validateCourseMetadata } from './validate.js'
 
-export type AliasEntry = { find: string | RegExp; replacement: string }
+const SVELTE_SHIM_PREFIX = '\0svelte-shim:'
 
-const SVELTE_SHIM = 'export default {}'
-const SVELTE_NAMESPACE = 'svelte-shim'
-
-function toSourcePath(resolvedPath: string): string {
-	const normalized = path.normalize(resolvedPath)
-	if (!normalized.endsWith('.js')) return normalized
-	const tsCandidate = `${normalized.slice(0, -'.js'.length)}.ts`
-	return existsSync(tsCandidate) ? tsCandidate : normalized
-}
-
-function resolveAlias(importPath: string, aliases: AliasEntry[]): string | undefined {
-	for (const alias of aliases) {
-		const { find, replacement } = alias
-		if (find instanceof RegExp) {
-			if (find.test(importPath)) {
-				return toSourcePath(importPath.replace(find, replacement))
-			}
-		} else if (importPath === find || importPath.startsWith(`${String(find)}/`)) {
-			return toSourcePath(importPath.replace(String(find), replacement))
-		}
-	}
-
-	return undefined
-}
-
-function buildAliasPlugin(aliases: AliasEntry[]): EsbuildPlugin {
-	return {
-		name: 'vite-alias',
-		setup(build: PluginBuild) {
-			build.onResolve({ filter: /^[^./]/ }, (arguments_) => {
-				const resolved = resolveAlias(arguments_.path, aliases)
-				if (resolved === undefined) return
-				return { path: resolved, namespace: 'file' }
-			})
-		},
-	}
-}
-
-function buildSvelteShimPlugin(): EsbuildPlugin {
+function svelteShimPlugin(): VitePlugin {
 	return {
 		name: 'svelte-shim',
-		setup(build: PluginBuild) {
-			build.onResolve({ filter: /\.(svelte|svx)(\?.*)?$/ }, (arguments_) => ({
-				path: arguments_.path,
-				namespace: SVELTE_NAMESPACE,
-			}))
-			build.onLoad({ filter: /.*/, namespace: SVELTE_NAMESPACE }, () => ({
-				contents: SVELTE_SHIM,
-				loader: 'js' as const,
-			}))
+		enforce: 'pre',
+		resolveId(source) {
+			if (/\.(svelte|svx)(\?.*)?$/.test(source)) {
+				return SVELTE_SHIM_PREFIX + source
+			}
+		},
+		load(id) {
+			if (id.startsWith(SVELTE_SHIM_PREFIX)) {
+				return 'export default {}'
+			}
 		},
 	}
 }
@@ -79,25 +41,39 @@ async function importBundledCourse(bundledCode: string, courseFilePath: string):
 
 export async function extractCourseMetadata(
 	courseFilePath: string,
-	aliases: AliasEntry[],
+	resolvedConfig: ResolvedConfig,
 ): Promise<CourseMetadata> {
-	const { build } = await import('esbuild')
-
 	const result = await build({
-		entryPoints: [courseFilePath],
-		bundle: true,
-		format: 'esm',
-		write: false,
-		platform: 'node',
-		target: 'node18',
-		plugins: [buildAliasPlugin(aliases), buildSvelteShimPlugin()],
+		configFile: false,
+		root: resolvedConfig.root,
+		resolve: {
+			alias: resolvedConfig.resolve.alias,
+		},
+		plugins: [svelteShimPlugin()],
+		build: {
+			lib: {
+				entry: courseFilePath,
+				formats: ['es'],
+				fileName: 'course',
+			},
+			write: false,
+			ssr: true,
+			rollupOptions: {
+				external: [/^node:/, /^[a-z]/],
+			},
+		},
+		logLevel: 'silent',
 	})
 
-	const outputFile = result.outputFiles?.[0]
-	if (!outputFile) {
-		throw new Error(`esbuild produced no output for: ${courseFilePath}`)
+	const output = Array.isArray(result) ? result[0]! : result as Rollup.RollupOutput
+	const chunk = output.output.find(
+		(o): o is Rollup.OutputChunk => o.type === 'chunk' && o.isEntry,
+	)
+
+	if (!chunk) {
+		throw new Error(`Vite build produced no entry chunk for: ${courseFilePath}`)
 	}
 
-	const rawCourse = await importBundledCourse(outputFile.text, courseFilePath)
+	const rawCourse = await importBundledCourse(chunk.code, courseFilePath)
 	return validateCourseMetadata(rawCourse)
 }

@@ -57,7 +57,7 @@ export type ScormPackagerOptions = {
 	outputDir?: string
 	/**
 	 * Custom course loader. Receives the absolute project root path.
-	 * When omitted, uses the built-in Svelte loader (esbuild + Node VM).
+	 * When omitted, uses the built-in Svelte loader (Vite + Node VM).
 	 */
 	loadCourse?: (root: string) => Promise<CourseMetadata>
 

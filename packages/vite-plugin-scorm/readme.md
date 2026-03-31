@@ -58,7 +58,7 @@ All fields are validated at build time. `id`, `title`, `minScore`, and `maxScore
 
 ## Custom Course Loader
 
-By default, the plugin uses esbuild to bundle and evaluate the course file. This works with Svelte projects out of the box (`.svelte` and `.svx` imports are shimmed).
+By default, the plugin uses Vite's build API to bundle and evaluate the course file. This works with Svelte projects out of the box (`.svelte` and `.svx` imports are shimmed).
 
 For non-Svelte projects or custom setups, provide a `loadCourse` function:
 
