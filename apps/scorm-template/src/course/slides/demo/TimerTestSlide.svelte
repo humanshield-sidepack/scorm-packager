@@ -1,5 +1,6 @@
 <script lang="ts">
   import { coursePlayer } from "$core/player/index.js";
+  import { Separator } from "$lib/components/ui/separator/index.js";
 
   const MS_PER_SECOND = 1000;
   const SECONDS_PER_MINUTE = 60;
@@ -7,40 +8,41 @@
   const PAD_CHAR = "0";
 
   function formatMs(ms: number): string {
-    const totalSeconds = Math.floor(ms / MS_PER_SECOND);
+    const totalSeconds = Math.max(0, Math.floor(ms / MS_PER_SECOND));
     const minutes = Math.floor(totalSeconds / SECONDS_PER_MINUTE);
     const seconds = totalSeconds % SECONDS_PER_MINUTE;
     return `${String(minutes).padStart(PAD_LENGTH, PAD_CHAR)}:${String(seconds).padStart(PAD_LENGTH, PAD_CHAR)}`;
   }
 </script>
 
-<article>
-  <h2>Timer Test</h2>
-  <p>
-    Both clocks should tick every second. If they update, reactive elapsed times
-    are working.
-  </p>
+<div class="mx-auto max-w-xl space-y-8 p-8">
+  <div class="space-y-2">
+    <h2 class="font-serif text-3xl font-bold text-foreground">Timer Test</h2>
+    <p class="text-sm text-muted-foreground">
+      Both clocks should tick every second. If they update, reactive elapsed
+      times are working.
+    </p>
+  </div>
 
-  <section>
-    <h3>Time on this slide</h3>
-    <p class="clock">{formatMs(coursePlayer.slide.elapsedMs)}</p>
-  </section>
+  <Separator />
 
-  <section>
-    <h3>Session time</h3>
-    <p class="clock">{formatMs(coursePlayer.session.elapsedMs)}</p>
-  </section>
-</article>
+  <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+    <div class="rounded-lg border bg-card p-6 shadow-sm">
+      <h3 class="text-sm font-medium text-muted-foreground">Time on slide</h3>
+      <p
+        class="mt-2 font-mono text-5xl font-bold tracking-wider text-foreground"
+      >
+        {formatMs(coursePlayer.slide.elapsedMs || 0)}
+      </p>
+    </div>
 
-<style>
-  .clock {
-    font-size: 4rem;
-    font-family: monospace;
-    font-weight: bold;
-    letter-spacing: 0.1em;
-  }
-
-  section + section {
-    margin-top: 2rem;
-  }
-</style>
+    <div class="rounded-lg border bg-card p-6 shadow-sm">
+      <h3 class="text-sm font-medium text-muted-foreground">Session time</h3>
+      <p
+        class="mt-2 font-mono text-5xl font-bold tracking-wider text-foreground"
+      >
+        {formatMs(coursePlayer.session.elapsedMs || 0)}
+      </p>
+    </div>
+  </div>
+</div>
