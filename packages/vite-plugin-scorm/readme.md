@@ -8,6 +8,14 @@ A Vite plugin that packages your build output into SCORM-compliant ZIP files. Su
 npm install vite-plugin-scorm
 ```
 
+## Install fflate
+
+The plugin uses `fflate` for ZIP generation. Install it as a peer dependency:
+
+```bash
+npm install -D fflate@^0.8.2
+```
+
 Requires `vite >= 5.0.0` as a peer dependency.
 
 ## Usage
@@ -18,12 +26,12 @@ import { defineConfig } from "vite";
 import { scormPackager } from "vite-plugin-scorm";
 
 export default defineConfig({
-  plugins: [
-    scormPackager({
-      courseFile: "src/course.ts",
-      target: "both",
-    }),
-  ],
+	plugins: [
+		scormPackager({
+			courseFile: "src/course.ts",
+			target: "both",
+		}),
+	],
 });
 ```
 
@@ -31,13 +39,13 @@ After `vite build`, SCORM ZIP packages are written to `scorm-packages/` (by defa
 
 ## Options
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `courseFile` | `string` | `'src/course.ts'` | Path to course definition file, relative to Vite root |
-| `entry` | `string` | `'index.html'` | Entry HTML filename in the build output |
-| `target` | `'1.2' \| '2004' \| 'both'` | `'both'` | SCORM version(s) to generate |
-| `outputDir` | `string` | `'scorm-packages'` | Output directory for ZIPs, relative to project root |
-| `loadCourse` | `(root: string) => Promise<CourseMetadata>` | Built-in Svelte loader | Custom course metadata loader |
+| Option       | Type                                        | Default                | Description                                           |
+| ------------ | ------------------------------------------- | ---------------------- | ----------------------------------------------------- |
+| `courseFile` | `string`                                    | `'src/course.ts'`      | Path to course definition file, relative to Vite root |
+| `entry`      | `string`                                    | `'index.html'`         | Entry HTML filename in the build output               |
+| `target`     | `'1.2' \| '2004' \| 'both'`                 | `'both'`               | SCORM version(s) to generate                          |
+| `outputDir`  | `string`                                    | `'scorm-packages'`     | Output directory for ZIPs, relative to project root   |
+| `loadCourse` | `(root: string) => Promise<CourseMetadata>` | Built-in Svelte loader | Custom course metadata loader                         |
 
 ## Course Metadata
 
@@ -45,12 +53,12 @@ The plugin reads course metadata from your course definition file. It expects a 
 
 ```ts
 type CourseMetadata = {
-  id: string; // Unique course identifier
-  title: string; // Course title
-  description?: string; // Optional description
-  masteryScore?: number; // Pass threshold 0–100 (SCORM 1.2 only)
-  minScore: number; // Minimum possible score
-  maxScore: number; // Maximum possible score
+	id: string; // Unique course identifier
+	title: string; // Course title
+	description?: string; // Optional description
+	masteryScore?: number; // Pass threshold 0–100 (SCORM 1.2 only)
+	minScore: number; // Minimum possible score
+	maxScore: number; // Maximum possible score
 };
 ```
 
@@ -64,12 +72,12 @@ For non-Svelte projects or custom setups, provide a `loadCourse` function:
 
 ```ts
 scormPackager({
-  loadCourse: async (root) => ({
-    id: "my-course",
-    title: "My Course",
-    minScore: 0,
-    maxScore: 100,
-  }),
+	loadCourse: async (root) => ({
+		id: "my-course",
+		title: "My Course",
+		minScore: 0,
+		maxScore: 100,
+	}),
 });
 ```
 
@@ -100,12 +108,12 @@ import { scormPackager } from "vite-plugin-scorm";
 
 // Types
 import type {
-  ScormPackagerOptions,
-  CourseMetadata,
-  DistributionFile,
-  FormatHandler,
-  FormatRegistry,
-  FormatContext,
-  FormatResult,
+	ScormPackagerOptions,
+	CourseMetadata,
+	DistributionFile,
+	FormatHandler,
+	FormatRegistry,
+	FormatContext,
+	FormatResult,
 } from "vite-plugin-scorm";
 ```
