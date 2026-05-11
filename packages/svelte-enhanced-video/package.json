@@ -70,7 +70,7 @@
 		"@repo/eslint-config": "workspace:*",
 		"@repo/typescript-config": "workspace:*",
 		"@sveltejs/adapter-vercel": "^6.3.1",
-		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/kit": "^2.57.1",
 		"@sveltejs/package": "^2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@types/node": "^24",
